@@ -64,8 +64,13 @@ export default function AppFeed() {
 
   useEffect(() => {
     async function fetchEvents() {
-      const { data } = await supabase.from("events").select("*").order("event_date", { ascending: true });
-      if (!data) return;
+if (!supabase) return;
+
+const { data } = await supabase
+  .from("events")
+  .select("*")
+  .order("event_date", { ascending: true });
+        if (!data) return;
 
       const grouped = data.reduce((acc: any[], current: any) => {
         const existing = acc.find((e) => e.club_name === current.club_name && e.event_date === current.event_date);
