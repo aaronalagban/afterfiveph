@@ -3,363 +3,587 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase-client";
-import { MapPin, ArrowUpRight, ArrowRight } from "lucide-react";
+import { 
+  MapPin, ArrowUpRight, Calendar, Disc, Map as MapIcon, 
+  X, Star, Zap, Instagram, ChevronLeft, ChevronRight
+} from "lucide-react";
 import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
 
-// --- SWISS / BRAND COLORS ---
+// --- CONFIG & PALETTE ---
 const COLORS = {
-  swissBlue: "#001BFF", 
-  pink: "#CE1E8D",      // Exact logo pink
-  yellow: "#F3E814",    // Exact logo yellow
-  black: "#050505",
-  white: "#F4F4F4",
+  dates: ["#00E5FF", "#76FF03", "#FFEB3B", "#D500F9", "#FF3D00"], 
+  cardHover: ["#FFEB3B", "#00E5FF", "#76FF03"]
 };
 
-// --- MAP CONFIGURATION ---
 const POBLACION_CENTER = { lat: 14.5648, lng: 121.0318 };
-const POBLACION_BARS =[
-  { name: "Kampai", lat: 14.5646, lng: 121.0315 },
-  { name: "Z Hostel Roofdeck", lat: 14.5655, lng: 121.0321 },
-  { name: "Run Rabbit Run", lat: 14.5641, lng: 121.0320 },
-  { name: "Alamat Filipino Pub", lat: 14.5649, lng: 121.0318 },
-  { name: "The Spirits Library", lat: 14.5658, lng: 121.0319 },
-  { name: "Agimat Foraging Bar", lat: 14.5644, lng: 121.0325 },
-  { name: "Bolero", lat: 14.5638, lng: 121.0322 },
+const POBLACION_BARS = [
+  { name: "Kampai", lat: 14.56396, lng: 121.03162, type: "Listening Bar", status: "03:00" },
+  { name: "Apotheka Manila", lat: 14.56462, lng: 121.03214, type: "Club", status: "04:00" },
+  { name: "Open House", lat: 14.56438, lng: 121.03177, type: "Listening Bar", status: "02:00" },
+  { name: "Uma After Dark", lat: 14.56509, lng: 121.03147, type: "Club", status: "03:00" },
 
-  { name: "Ugly Duck", lat: 14.5650, lng: 121.0314 },
-  { name: "OTO", lat: 14.5645, lng: 121.0310 },
-  { name: "The Annex House", lat: 14.5652, lng: 121.0316 },
-  { name: "Cheshire", lat: 14.5647, lng: 121.0323 },
-  { name: "Tango", lat: 14.5643, lng: 121.0317 },
-  { name: "Sanctuary", lat: 14.5648, lng: 121.0326 },
-  { name: "Atmosfera", lat: 14.5653, lng: 121.0312 },
-  { name: "Lynx", lat: 14.5642, lng: 121.0327 },
-  { name: "Reverie", lat: 14.5651, lng: 121.0324 },
+  { name: "Z Hostel Roofdeck", lat: 14.56547, lng: 121.03196, type: "Rooftop", status: "02:00" },
+  { name: "Run Rabbit Run", lat: 14.56410, lng: 121.03230, type: "Speakeasy", status: "01:00" },
+  { name: "OTO", lat: 14.56447, lng: 121.03089, type: "Hi-Fi Bar", status: "02:00" },
+  { name: "Agimat", lat: 14.56431, lng: 121.03256, type: "Cocktail Bar", status: "02:00" },
+  { name: "Spirits Library", lat: 14.56578, lng: 121.03183, type: "Cocktail Bar", status: "03:00" },
+  { name: "Alamat", lat: 14.56484, lng: 121.03163, type: "Bar", status: "02:00" },
 
-  { name: "Handlebar", lat: 14.5656, lng: 121.0308 },
-  { name: "The Fun Roof", lat: 14.5657, lng: 121.0313 },
-  { name: "Filling Station Bar", lat: 14.5661, lng: 121.0311 },
-  { name: "The Social", lat: 14.5649, lng: 121.0309 }
+  { name: "Ugly Duck", lat: 14.56466, lng: 121.03209, type: "Tapas Bar", status: "02:00" },
+  { name: "Buccaneers Rum & Kitchen", lat: 14.56521, lng: 121.03228, type: "Rum Bar", status: "02:00" },
+  { name: "Japonesa", lat: 14.56502, lng: 121.03199, type: "Bar", status: "02:00" },
+  { name: "Polilya", lat: 14.56473, lng: 121.03071, type: "Restaurant Bar", status: "00:00" },
+  { name: "Funky Monkey", lat: 14.56407, lng: 121.03011, type: "Bar", status: "02:00" },
+
+  { name: "Almacen", lat: 14.56429, lng: 121.03112, type: "Bar", status: "02:00" },
+  { name: "The Way Out", lat: 14.56495, lng: 121.03243, type: "Club", status: "03:00" },
+  { name: "WYP (What's Your Poison)", lat: 14.56562, lng: 121.03102, type: "Cocktail Bar", status: "02:00" }
 ];
 
-const swissMapStyle =[
-  { elementType: "geometry", stylers:[{ color: "#F4F4F4" }] },
-  { elementType: "labels.icon", stylers:[{ visibility: "off" }] },
-  { elementType: "labels.text.fill", stylers:[{ color: "#001BFF" }] },
-  { elementType: "labels.text.stroke", stylers:[{ color: "#ffffff" }, { weight: 4 }] },
-  { featureType: "road", elementType: "geometry.fill", stylers:[{ color: "#001BFF" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#050505" }] },
+const popMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { elementType: "labels.text.stroke", stylers: [{ visibility: "off" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#000000" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#000000" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#000000" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#00E5FF" }] },
 ];
 
-export default function AppFeed() {
+export default function AfterFivePop() {
   const [events, setEvents] = useState<any[]>([]);
-  const[loading, setLoading] = useState(true);
-  const [isScrolled, setIsScrolled] = useState(false);
-
+  const [loading, setLoading] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
+  const [showBetaModal, setShowBetaModal] = useState(false);
+  const [view, setView] = useState<"LIVE" | "AGENDA" | "ARCHIVE" | "MAP">("LIVE");
+  
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-  const { isLoaded: isMapLoaded } = useLoadScript({
-    googleMapsApiKey: googleMapsKey || "",
-  });
+  const { isLoaded: isMapLoaded } = useLoadScript({ googleMapsApiKey: googleMapsKey || "" });
 
   useEffect(() => {
-    async function fetchEvents() {
-if (!supabase) return;
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+      setShowBetaModal(true); 
+    }, 3500);
 
-const { data } = await supabase
-  .from("events")
-  .select("*")
-  .order("event_date", { ascending: true });
-        if (!data) return;
-
-      const grouped = data.reduce((acc: any[], current: any) => {
-        const existing = acc.find((e) => e.club_name === current.club_name && e.event_date === current.event_date);
-        if (existing) {
-          if (!existing.dj_names.includes(current.dj_name)) existing.dj_names.push(current.dj_name);
-        } else {
-          acc.push({ ...current, dj_names:[current.dj_name] });
-        }
-        return acc;
-      },[]);
-
-      setEvents(grouped);
+    async function init() {
+      if (!supabase) { setLoading(false); return; }
+      const { data } = await supabase.from("events").select("*").order("event_date", { ascending: true });
+      
+      if (data) {
+        const grouped = data.reduce((acc: any[], current: any) => {
+          const existing = acc.find((e) => 
+            e.club_name === current.club_name && 
+            e.event_date === current.event_date &&
+            e.event_name === current.event_name 
+          );
+          if (existing) {
+            if (!existing.dj_names.includes(current.dj_name)) existing.dj_names.push(current.dj_name);
+          } else {
+            acc.push({ ...current, dj_names: [current.dj_name] });
+          }
+          return acc;
+        }, []);
+        setEvents(grouped);
+      }
       setLoading(false);
     }
-    fetchEvents();
-  },[]);
+    init();
+    return () => clearTimeout(timer);
+  }, []);
 
-  // Tracks scroll to hide header elements (except logo)
-  const handleScroll = (e: React.UIEvent<HTMLElement>) => {
-    setIsScrolled(e.currentTarget.scrollTop > 50);
+  // Time Logic
+  const getLogicalToday = () => {
+    const now = new Date();
+    now.setHours(now.getHours() - 5);
+    return now.toISOString().split('T')[0];
   };
 
-  const today = new Date().toLocaleDateString("en-CA");
-  const normalizeDbDate = (dbDateString: string) => dbDateString?.substring(0, 10).replace(/[ \/]/g, "-") || "";
-
-  const exactTonightEvent = events.find((e) => normalizeDbDate(e.event_date) === today);
-  const allUpcomingEvents = events
-    .filter((e) => normalizeDbDate(e.event_date) > today)
-    .sort((a, b) => new Date(normalizeDbDate(a.event_date)).getTime() - new Date(normalizeDbDate(b.event_date)).getTime());
-  const pastEvents = events
-    .filter((e) => normalizeDbDate(e.event_date) < today)
-    .sort((a, b) => new Date(normalizeDbDate(b.event_date)).getTime() - new Date(normalizeDbDate(a.event_date)).getTime());
-
-  const featuredEvent = exactTonightEvent || allUpcomingEvents[0];
-  const isTonight = !!exactTonightEvent;
-  const displayUpcoming = isTonight ? allUpcomingEvents : allUpcomingEvents.slice(1);
-
-  const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-  };
+  const today = getLogicalToday();
+  const normalizeDbDate = (d: string) => d?.substring(0, 10).replace(/[ /]/g, "-") || "";
+  
+  const tonightEvents = events.filter((e) => normalizeDbDate(e.event_date) === today);
+  const upcomingEvents = events.filter((e) => normalizeDbDate(e.event_date) > today);
+  const pastEvents = events.filter((e) => normalizeDbDate(e.event_date) < today).reverse();
+  const galleryData = tonightEvents.length > 0 ? tonightEvents : upcomingEvents;
 
   return (
-    <div className="bg-[#F4F4F4] text-[#050505] font-sans selection:bg-[#CE1E8D] selection:text-white overflow-hidden">
+    <div className="fixed inset-0 w-full h-full font-sans overflow-hidden flex flex-col md:flex-row bg-white text-black">
       
-      {/* GLOBAL CSS */}
       <style dangerouslySetInnerHTML={{ __html: `
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; }
-        .swiss-border { border: 4px solid #050505; }
-        .swiss-shadow { box-shadow: 8px 8px 0px 0px #050505; }
-        .swiss-shadow-hover:hover { transform: translate(-4px, -4px); box-shadow: 12px 12px 0px 0px #050505; }
-        .swiss-shadow-hover:active { transform: translate(4px, 4px); box-shadow: 0px 0px 0px 0px #050505; }
+        .hard-shadow { box-shadow: 6px 6px 0px 0px #000; }
+        .hard-shadow-sm { box-shadow: 3px 3px 0px 0px #000; }
+        .hard-shadow-date { box-shadow: 0px 4px 0px 0px #000; }
+        
+        .playful-bg {
+          background-color: #ffffff;
+          background-image: radial-gradient(#000 1.5px, transparent 1.5px), radial-gradient(#000 1.5px, #ffffff 1.5px);
+          background-size: 40px 40px;
+          background-position: 0 0, 20px 20px;
+          animation: bgShift 10s linear infinite;
+        }
+        
+        .color-wash {
+          background: linear-gradient(45deg, rgba(0,229,255,0.15), rgba(118,255,3,0.15), rgba(255,235,59,0.15), rgba(213,0,249,0.15));
+          background-size: 400% 400%;
+          animation: gradientMove 8s ease infinite;
+        }
+
+        @keyframes bgShift {
+          0% { background-position: 0 0, 20px 20px; }
+          100% { background-position: 40px 40px, 60px 60px; }
+        }
+
+        @keyframes gradientMove {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
       `}} />
 
-      {/* DYNAMIC HEADER - Fades out entirely EXCEPT for the Logo */}
-      <header className={`fixed top-0 w-full z-50 transition-all duration-500 flex justify-between items-center px-4 md:px-8 py-3 h-[80px] ${isScrolled ? 'bg-transparent border-transparent pointer-events-none' : 'bg-[#F4F4F4] border-b-4 border-[#050505]'}`}>
+      {/* --- SPLASH SCREEN --- */}
+      <AnimatePresence>
+        {showSplash && (
+          <motion.div 
+            className="fixed inset-0 z-[100] bg-[#FF3D00] flex flex-col items-center justify-center p-8 text-center"
+            exit={{ y: "-100%", transition: { duration: 0.8, ease: "circIn" } }}
+          >
+            <h1 className="font-black text-6xl md:text-9xl text-white tracking-tighter uppercase mb-4 animate-pulse drop-shadow-[8px_8px_0px_#000]">
+              AFTER<br/>FIVE®
+            </h1>
+            <div className="overflow-hidden">
+              <motion.p 
+                initial={{ y: "100%" }} 
+                animate={{ y: 0 }} 
+                transition={{ delay: 0.5, duration: 0.5 }}
+                className="font-mono font-bold text-lg md:text-2xl bg-black text-white px-4 py-2 rotate-2 border-2 border-white"
+              >
+                WHERE MANILA GOES AFTER FIVE
+              </motion.p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* --- BETA MODAL --- */}
+      <AnimatePresence>
+        {showBetaModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white border-2 border-black hard-shadow p-8 max-w-sm w-full text-center"
+            >
+              <h2 className="font-black text-3xl uppercase mb-4">WIP / BETA</h2>
+              <p className="font-mono text-sm mb-6 leading-relaxed">
+  AfterFive is currently in beta. If you have any suggestions or find bugs, feel free to slide into my DMs:
+  <a 
+    href="https://instagram.com/aaronalagbann" 
+    target="_blank" 
+    className="text-[#FF3D00] font-bold block mt-2 hover:underline"
+  >
+    @aaronalagbann
+  </a>
+
+  <span className="block mt-4">Currently tracking venues:</span>
+  <span className="block mt-3 text-neutral-400">
+    Kampai • Apotheka Manila • Open House • Uma After Dark
+  </span>
+
+  <span className="block mt-4 text-neutral-500 text-xs">
+    Some events may not appear yet due to current automation limits. If your event is missing, send it over.
+  </span>
+</p>
+              <button 
+                onClick={() => setShowBetaModal(false)}
+                className="w-full bg-black text-white py-3 font-black uppercase hover:bg-[#FF3D00] transition-colors border-2 border-black"
+              >
+                Aight
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- DESKTOP SIDEBAR --- */}
+      <nav className="hidden md:flex flex-col w-[260px] h-full border-r-2 border-black z-50 shrink-0 bg-white">
+        <div className="h-[180px] border-b-2 border-black bg-[#FFEB3B] flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
+           <div className="absolute inset-0 playful-bg opacity-20" />
+           <h1 className="font-black text-5xl tracking-tighter italic z-10 relative bg-white border-2 border-black px-4 py-2 shadow-[4px_4px_0px_#000] -rotate-3 hover:rotate-0 transition-transform cursor-pointer">AFTERFIVE</h1>
+        </div>
         
-        {/* LOGO (Stays visible, slightly shrinks on scroll) */}
-        <div className={`pointer-events-auto transition-transform duration-500 ${isScrolled ? 'scale-90 -translate-y-1' : 'scale-100'}`}>
-          <div className="w-14 h-14 md:w-16 md:h-16 swiss-border overflow-hidden bg-[#CE1E8D]">
-             <img src="/logo.png" alt="AfterFive Logo" className="w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} />
+        <div className="flex-1 flex flex-col overflow-y-auto hide-scrollbar">
+          <SidebarLink label="LIVE" sub="HAPPENING NOW" active={view === "LIVE"} onClick={() => setView("LIVE")} color="#00E5FF" icon={<Zap />} />
+          <SidebarLink label="UPCOMING" sub="THIS WEEK" active={view === "AGENDA"} onClick={() => setView("AGENDA")} color="#76FF03" icon={<Calendar />} />
+          <SidebarLink label="ARCHIVES" sub="WHAT YOU MISSED" active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} color="#D500F9" icon={<Disc />} />
+          <SidebarLink label="MAP" sub="VENUES" active={view === "MAP"} onClick={() => setView("MAP")} color="#FF3D00" icon={<MapIcon />} />
+
+          <div className="mt-auto p-6 border-t-2 border-black bg-[#F0F0F0]">
+            <div className="bg-white border-2 border-black px-3 py-2 flex items-center gap-2 justify-center shadow-[3px_3px_0px_#000]">
+              <span className="w-2 h-2 bg-[#FF3D00] rounded-full animate-pulse" />
+              <span className="font-black text-[10px] tracking-widest uppercase">Beta Build v0.1</span>
+            </div>
           </div>
         </div>
-        
-        {/* Fading Button */}
-        <div className={`bg-[#F3E814] swiss-border px-4 py-2 flex items-center gap-2 swiss-shadow transition-all duration-300 pointer-events-auto cursor-pointer ${isScrolled ? 'opacity-0 translate-x-4 pointer-events-none' : 'opacity-100 hover:bg-[#CE1E8D] hover:text-white'}`}>
-          <div className="w-2.5 h-2.5 rounded-full bg-[#050505] animate-pulse" />
-          <span className="text-xs font-black uppercase tracking-widest hidden md:inline-block">Live Signals</span>
-          <span className="text-xs font-black uppercase tracking-widest md:hidden">Live</span>
-        </div>
-      </header>
 
-      {/* DESKTOP/MOBILE NAVIGATION PILL */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] md:w-auto max-w-[500px]">
-        <div className="bg-[#050505] p-2 flex items-center justify-between rounded-none swiss-shadow border-2 border-white/10">
-          <button onClick={() => scrollTo("hero")} className="flex-1 md:px-6 py-3 text-[10px] md:text-xs font-black uppercase tracking-widest text-[#F4F4F4] hover:bg-[#001BFF] transition-colors border-r border-white/20">Now</button>
-          <button onClick={() => scrollTo("upcoming")} className="flex-1 md:px-6 py-3 text-[10px] md:text-xs font-black uppercase tracking-widest text-[#F4F4F4] hover:bg-[#F3E814] hover:text-[#050505] transition-colors border-r border-white/20">Next</button>
-          <button onClick={() => scrollTo("archive")} className="flex-1 md:px-6 py-3 text-[10px] md:text-xs font-black uppercase tracking-widest text-[#F4F4F4] hover:bg-[#CE1E8D] transition-colors border-r border-white/20">Missed</button>
-          <button onClick={() => scrollTo("map")} className="flex-1 md:px-6 py-3 text-[10px] md:text-xs font-black uppercase tracking-widest text-[#F4F4F4] hover:bg-[#F4F4F4] hover:text-[#050505] transition-colors">Map</button>
+        <div className="p-4 bg-black text-white border-t-2 border-black">
+          <Marquee text="MANILA AFTER DARK • DRINK RESPONSIBLY • " />
         </div>
       </nav>
 
-      {/* MAIN SNAP CONTAINER - 100dvh hugs screen perfectly */}
-      <main onScroll={handleScroll} className="h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth hide-scrollbar relative z-10">
-        
-        {/* SECTION 1: HERO (SPLIT DESKTOP, STACKED MOBILE) */}
-        <section id="hero" className="h-[100dvh] w-full snap-start flex flex-col lg:flex-row relative bg-[#001BFF] text-[#F4F4F4] overflow-hidden">
-          
-          <div className="absolute -left-10 top-20 text-[#F4F4F4]/10 font-black text-[40vw] leading-none pointer-events-none">»</div>
+      {/* --- MAIN CONTENT --- */}
+      <main className="flex-1 w-full h-full relative overflow-hidden bg-white flex flex-col">
+        <div className="md:hidden h-[60px] w-full border-b-2 border-black bg-[#FFEB3B] flex items-center justify-between px-4 z-50 shrink-0">
+           <h1 className="font-black text-2xl tracking-tighter italic">AFTERFIVE</h1>
+           <div className="bg-black text-white px-2 py-0.5 text-[10px] font-bold font-mono border border-black shadow-[2px_2px_0px_#FF3D00]">BETA</div>
+        </div>
 
-          {/* Left Column: Text Content */}
-          <div className="w-full lg:w-1/2 h-[50dvh] lg:h-[100dvh] p-6 pt-28 md:p-12 md:pt-36 flex flex-col justify-center relative z-10">
-            <div className="inline-block bg-[#F3E814] text-[#050505] px-3 py-1 mb-4 lg:mb-6 self-start transform -rotate-2 swiss-border swiss-shadow">
-              <span className="text-xs md:text-sm font-black uppercase tracking-widest">
-                {isTonight ? "Happening Tonight" : "Up Next"} • {featuredEvent ? new Date(normalizeDbDate(featuredEvent.event_date)).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit" }).replace("/", ".") : ""}
-              </span>
-            </div>
-
-            <h2 className="text-[14vw] lg:text-[7vw] font-black uppercase leading-[0.85] tracking-tighter mb-4 lg:mb-8 line-clamp-3">
-              {(featuredEvent?.dj_names || ["STANDBY"]).join(" • ")}
-            </h2>
-
-            {featuredEvent && (
-              <div className="flex items-center gap-3 bg-[#050505] text-[#F4F4F4] px-4 py-2 lg:px-5 lg:py-3 self-start border border-white/20">
-                <MapPin className="w-4 h-4 lg:w-5 lg:h-5 text-[#CE1E8D]" />
-                <span className="font-bold uppercase tracking-widest text-sm lg:text-lg">{featuredEvent.club_name}</span>
-              </div>
+        <div className="flex-1 w-full relative overflow-y-auto hide-scrollbar pb-[50px] md:pb-0">
+          <AnimatePresence mode="wait">
+            {!loading && (
+              <>
+                {view === "LIVE" && <GalleryView key="LIVE" events={galleryData} />}
+                {view === "AGENDA" && <BlockListView key="AGENDA" title="INCOMING" events={upcomingEvents} theme="vibrant" />}
+                {view === "ARCHIVE" && <BlockListView key="ARCHIVE" title="ARCHIVE" events={pastEvents} theme="dark" />}
+                {view === "MAP" && <MapView key="MAP" isLoaded={isMapLoaded} />}
+              </>
             )}
-          </div>
-
-          {/* Right Column: Dynamic Uncropped Poster */}
-          <div className="w-full lg:w-1/2 h-[50dvh] lg:h-[100dvh] bg-[#050505] relative p-4 pb-28 md:p-12 md:pt-32 flex items-center justify-center lg:border-l-4 border-[#050505]">
-            {featuredEvent ? (
-              <a href={featuredEvent.link || featuredEvent.image_url} target="_blank" rel="noopener noreferrer" className="relative w-full h-full max-w-2xl group cursor-pointer block">
-                <div className="absolute inset-0 overflow-hidden bg-[#050505]">
-                  <img src={featuredEvent.image_url} className="w-full h-full object-cover blur-3xl opacity-60 scale-125 group-hover:opacity-80 transition-opacity duration-500" alt="" />
-                </div>
-                
-                <div className="absolute inset-0 p-2 md:p-8 flex items-center justify-center transition-transform duration-500 group-hover:scale-105 z-10">
-                   <img src={featuredEvent.image_url} className="w-auto h-full max-h-[100%] object-contain swiss-border shadow-[10px_10px_0px_#050505] md:shadow-[20px_20px_0px_#050505]" alt="Event Poster" />
-                </div>
-
-                <div className="absolute top-4 right-4 bg-[#CE1E8D] text-white p-2 md:p-3 rounded-full swiss-border z-20 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">
-                  <ArrowUpRight className="w-5 h-5" />
-                </div>
-              </a>
-            ) : null}
-          </div>
-        </section>
-
-        {/* SECTION 2: UPCOMING EVENTS - MASSIVE POSTERS */}
-        {displayUpcoming.length > 0 && (
-          <section id="upcoming" className="h-[100dvh] w-full snap-start bg-[#F4F4F4] flex flex-col pt-24 pb-28 relative overflow-hidden">
-            
-            <div className="absolute top-10 right-10 text-[#050505]/5 font-black text-[40vw] leading-none pointer-events-none">!</div>
-
-            <div className="px-6 md:px-12 mb-6 flex justify-between items-end relative z-10">
-              <h3 className="text-5xl md:text-[6vw] font-black tracking-tighter uppercase leading-[0.8] text-[#001BFF]">
-                Incoming<br/>Signals
-              </h3>
-              <ArrowRight className="w-10 h-10 text-[#F3E814] bg-[#050505] rounded-full p-2 hidden md:block" />
-            </div>
-
-            {/* Horizontal Scroll with Massive Cards */}
-            <div className="flex-1 flex gap-6 md:gap-10 overflow-x-auto snap-x snap-mandatory hide-scrollbar px-6 md:px-12 items-center z-10">
-              {displayUpcoming.map((event, i) => (
-                <a 
-                  key={i} href={event.link || event.image_url} target="_blank" rel="noopener noreferrer"
-                  className="min-w-[85vw] md:min-w-[500px] h-full max-h-[70dvh] md:max-h-[75dvh] bg-[#F3E814] swiss-border swiss-shadow swiss-shadow-hover transition-all snap-center flex flex-col relative group cursor-pointer"
-                >
-                  <div className="bg-[#050505] text-white px-4 py-3 md:px-5 md:py-4 flex justify-between items-center border-b-4 border-[#050505] shrink-0">
-                     <span className="font-black text-xl md:text-2xl uppercase tracking-tighter">{new Date(normalizeDbDate(event.event_date)).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                     <div className="w-3 h-3 md:w-4 md:h-4 bg-[#CE1E8D] rounded-full" />
-                  </div>
-
-                  <div className="flex-1 bg-black relative overflow-hidden border-b-4 border-[#050505]">
-                    <div className="absolute inset-0">
-                      <img src={event.image_url} className="w-full h-full object-cover blur-2xl opacity-40 group-hover:opacity-60 transition-opacity" alt="" />
-                    </div>
-                    <img src={event.image_url} className="absolute inset-0 w-full h-full object-contain p-2 md:p-4 group-hover:scale-105 transition-transform duration-500 z-10" alt="Poster" />
-                  </div>
-
-                  <div className="bg-[#F4F4F4] p-4 md:p-5 shrink-0">
-                    <h4 className="font-black text-2xl md:text-3xl uppercase tracking-tight truncate mb-1 text-[#001BFF]">
-                      {(event.dj_names ||[]).join(", ")}
-                    </h4>
-                    <p className="font-black text-xs md:text-sm uppercase tracking-widest text-[#050505] flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-[#CE1E8D]" /> {event.club_name}
-                    </p>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* SECTION 3: THE "WOW" EXPANDING ARCHIVE (BELOW UPCOMING) */}
-        {pastEvents.length > 0 && (
-          <section id="archive" className="h-[100dvh] w-full snap-start bg-[#CE1E8D] flex flex-col pt-24 pb-32 relative overflow-hidden">
-            
-            <div className="absolute bottom-10 left-10 text-[#050505]/10 font-black text-[30vw] leading-none pointer-events-none">X</div>
-
-            <div className="px-6 md:px-12 flex items-center gap-6 mb-8 relative z-10">
-              <h3 className="text-5xl md:text-7xl font-black tracking-tighter uppercase text-[#F3E814]" style={{ WebkitTextStroke: '2px #050505' }}>
-                Missed
-              </h3>
-              <div className="h-[4px] flex-1 bg-[#050505]" />
-            </div>
-
-            {/* Horizontal Accordion - Expanding Cards */}
-            <div className="flex-1 flex gap-4 md:gap-6 overflow-x-auto snap-x snap-mandatory hide-scrollbar px-6 md:px-12 items-center z-10 pb-4">
-              {pastEvents.slice(0, 10).map((event, i) => (
-                <a
-                  href={event.link || event.image_url} target="_blank" rel="noopener noreferrer"
-                  key={i}
-                  className="shrink-0 w-[55vw] md:w-[250px] hover:w-[85vw] md:hover:w-[600px] h-[55dvh] md:h-[65dvh] bg-[#050505] swiss-border flex flex-col group relative overflow-hidden swiss-shadow hover:swiss-shadow-hover transition-[width,transform] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] snap-center"
-                >
-                  <div className="absolute inset-0 bg-[#050505]">
-                    {/* Blurred Background (Fills space when expanded) */}
-                    <img 
-                      src={event.image_url} 
-                      className="absolute inset-0 w-full h-full object-cover opacity-30 blur-xl group-hover:opacity-50 transition-opacity duration-700" 
-                      alt="" 
-                    />
-                    {/* Foreground Image: Smoothly transitions to Uncropped */}
-                    <img
-                      src={event.image_url}
-                      className="absolute inset-0 w-full h-full object-cover group-hover:object-contain grayscale group-hover:grayscale-0 transition-all duration-700 z-10 group-hover:p-4 md:group-hover:p-8"
-                      alt="Archived event"
-                    />
-                  </div>
-
-                  {/* Top "Missed" tag (fades out on hover) */}
-                  <div className="absolute top-4 left-4 z-20 transition-opacity duration-300 group-hover:opacity-0">
-                      <div className="bg-[#F4F4F4] text-[#050505] px-2 py-1 swiss-border">
-                         <span className="font-black text-[10px] uppercase">Archived</span>
-                      </div>
-                  </div>
-
-                  {/* MASSIVE Hover Info Panel (Slides up from bottom) */}
-                  <div className="absolute bottom-0 left-0 w-full p-4 md:p-8 bg-gradient-to-t from-[#050505] via-[#050505]/90 to-transparent translate-y-[120%] group-hover:translate-y-0 transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] z-20 flex flex-col justify-end">
-                    <p className="text-xs md:text-sm font-black text-[#CE1E8D] uppercase tracking-widest mb-1 drop-shadow-md">
-                      {new Date(normalizeDbDate(event.event_date)).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-                    </p>
-                    <h5 className="font-black text-2xl md:text-5xl uppercase leading-none tracking-tighter text-[#F4F4F4] drop-shadow-lg mb-2">
-                      {(event.dj_names ||[]).join(", ")}
-                    </h5>
-                    <p className="text-sm md:text-lg font-bold text-[#F3E814] uppercase tracking-widest flex items-center gap-2 drop-shadow-md">
-                      <MapPin className="w-4 h-4 md:w-5 md:h-5" /> {event.club_name}
-                    </p>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* SECTION 4: MAP */}
-        <section id="map" className="h-[100dvh] w-full snap-start bg-[#050505] flex flex-col lg:flex-row relative overflow-hidden">
-          
-          <div className="w-full lg:w-1/3 p-6 pt-24 md:p-12 md:pt-32 flex flex-col justify-center bg-[#F3E814] text-[#050505] z-10 swiss-border lg:border-y-0 lg:border-l-0 shrink-0">
-            <h3 className="text-6xl md:text-[6vw] font-black tracking-tighter uppercase leading-[0.85] mb-6">
-              The<br/><span className="text-[#001BFF]">Grid</span>
-            </h3>
-            <p className="font-bold text-sm md:text-lg uppercase tracking-widest border-t-4 border-[#050505] pt-4 md:pt-6">
-              Poblacion, Makati City
-            </p>
-          </div>
-
-          <div className="w-full lg:w-2/3 flex-1 lg:h-full relative pb-20 lg:pb-0">
-            {!isMapLoaded ? (
-              <div className="w-full h-full bg-[#F4F4F4] flex items-center justify-center">
-                <div className="w-16 h-16 bg-[#001BFF] swiss-border animate-spin" />
-              </div>
-            ) : (
-              <GoogleMap
-                mapContainerClassName="w-full h-full"
-                center={POBLACION_CENTER}
-                zoom={17}
-                options={{
-                  styles: swissMapStyle,
-                  disableDefaultUI: true,
-                  gestureHandling: "cooperative"
-                }}
-              >
-                {POBLACION_BARS.map((bar, index) => (
-                  <Marker
-                    key={index}
-                    position={{ lat: bar.lat, lng: bar.lng }}
-                    icon={{
-                      path: typeof window !== "undefined" ? window.google.maps.SymbolPath.CIRCLE : 0,
-                      fillColor: COLORS.yellow,
-                      fillOpacity: 1,
-                      strokeWeight: 4,
-                      strokeColor: COLORS.black,
-                      scale: 14,
-                    }}
-                  />
-                ))}
-              </GoogleMap>
-            )}
-            
-            <div className="absolute top-4 right-4 md:top-6 md:right-6 bg-[#001BFF] text-white swiss-border px-3 py-1.5 md:px-4 md:py-2 swiss-shadow hidden md:block">
-              <span className="text-xs md:text-sm font-black uppercase tracking-widest">Live View</span>
-            </div>
-          </div>
-        </section>
-
+          </AnimatePresence>
+        </div>
       </main>
+
+      {/* --- SLIM MOBILE NAV --- */}
+      <div className="md:hidden fixed bottom-0 left-0 w-full h-12 bg-white border-t-2 border-black z-50 flex items-stretch">
+         <MobileNavBtn icon={<Zap size={18} />} active={view === "LIVE"} onClick={() => setView("LIVE")} />
+         <div className="w-[2px] h-full bg-black" />
+         <MobileNavBtn icon={<Calendar size={18} />} active={view === "AGENDA"} onClick={() => setView("AGENDA")} />
+         <div className="w-[2px] h-full bg-black" />
+         <MobileNavBtn icon={<Disc size={18} />} active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} />
+         <div className="w-[2px] h-full bg-black" />
+         <MobileNavBtn icon={<MapIcon size={18} />} active={view === "MAP"} onClick={() => setView("MAP")} />
+      </div>
+
     </div>
-  );}
+  );
+}
+
+// ==========================================
+// 1. GALLERY VIEW (Signal)
+// ==========================================
+function GalleryView({ events }: { events: any[] }) {
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    if (events.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % events.length);
+    }, 6000); 
+    return () => clearInterval(interval);
+  }, [events.length]);
+
+  if (!events || events.length === 0) return <EmptyState />;
+
+  const activeEvent = events[current];
+  const next = () => setCurrent((prev) => (prev + 1) % events.length);
+  const prev = () => setCurrent((prev) => (prev - 1 + events.length) % events.length);
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full flex flex-col relative bg-[#F0F0F0] overflow-hidden">
+       <div className="absolute inset-0 playful-bg opacity-10 pointer-events-none" />
+       <div className="absolute inset-0 color-wash opacity-30 pointer-events-none" />
+       
+       <div className="flex-1 relative flex items-center justify-center p-6 md:p-12 overflow-hidden">
+          <div className={`absolute inset-0 opacity-20 transition-colors duration-1000 ${current % 2 === 0 ? 'bg-[#00E5FF]' : 'bg-[#FF3D00]'}`} />
+
+          {events.length > 1 && (
+            <>
+              <button onClick={prev} className="absolute left-2 md:left-8 z-20 p-2 md:p-3 bg-white border-2 border-black hover:bg-[#FFEB3B] hard-shadow-sm active:translate-y-1 active:shadow-none"><ChevronLeft size={20} /></button>
+              <button onClick={next} className="absolute right-2 md:right-8 z-20 p-2 md:p-3 bg-white border-2 border-black hover:bg-[#FFEB3B] hard-shadow-sm active:translate-y-1 active:shadow-none"><ChevronRight size={20} /></button>
+            </>
+          )}
+
+          <AnimatePresence mode="wait">
+            <motion.div 
+              key={activeEvent.image_url}
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ duration: 0.3 }}
+              className="relative z-10 h-full w-auto max-w-full flex justify-center bg-white border-2 md:border-4 border-black p-2 md:p-4 shadow-[8px_8px_0px_rgba(0,0,0,1)]"
+            >
+               <img src={activeEvent.image_url} className="h-full w-auto object-contain max-w-full" alt="Gig Poster" />
+               <div className="absolute top-0 right-0 translate-x-2 -translate-y-2 bg-black text-white px-2 py-0.5 font-mono font-bold text-xs border-2 border-white shadow-[2px_2px_0px_#FFEB3B] rotate-3">
+                  {current + 1} / {events.length}
+               </div>
+            </motion.div>
+          </AnimatePresence>
+       </div>
+
+       <div className="h-auto shrink-0 bg-white border-t-2 border-black flex flex-row md:items-stretch z-20 relative shadow-[0px_-4px_10px_rgba(0,0,0,0.1)]">
+          <div className="w-[90px] md:w-[200px] shrink-0 bg-[#FFEB3B] border-r-2 border-black p-2 md:p-4 flex flex-col justify-center items-center text-center">
+             <span className="font-mono font-bold text-[9px] md:text-sm uppercase tracking-widest mb-1">Happening</span>
+             <span className="font-black text-3xl md:text-6xl uppercase leading-none">{new Date(activeEvent.event_date).getDate()}</span>
+             <span className="font-black text-[10px] md:text-xl uppercase">{new Date(activeEvent.event_date).toLocaleDateString("en-US", { month: 'short' })}</span>
+          </div>
+
+          <div className="flex-1 flex flex-col justify-center relative overflow-hidden min-w-0">
+             <div className="w-full h-5 md:h-7 bg-black text-white flex items-center overflow-hidden shrink-0">
+                <Marquee text={`NOW PLAYING AT @${activeEvent.club_name.toUpperCase()} // `} />
+             </div>
+             
+             <div className="p-3 md:p-6 overflow-hidden bg-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-black text-xl md:text-5xl uppercase leading-none mb-2 md:mb-3 truncate text-black drop-shadow-[1px_1px_0px_#FF3D00]">
+                     {activeEvent.event_name || "LIVE SESSION"}
+                  </h2>
+                  <div className="flex flex-wrap gap-1 md:gap-2">
+                     {activeEvent.dj_names.slice(0, 4).map((dj: string, i: number) => (
+                        <span key={i} className="bg-black text-white px-1.5 py-0.5 font-mono font-bold text-[9px] md:text-xs uppercase border border-black shadow-[2px_2px_0px_#00E5FF]">
+                           {dj}
+                        </span>
+                     ))}
+                     {activeEvent.dj_names.length > 4 && <span className="text-[10px] font-bold py-0.5">+MORE</span>}
+                  </div>
+                </div>
+
+                <a href={activeEvent.ig_post_url} target="_blank" className="bg-[#FF3D00] text-white px-4 py-3 md:px-6 md:py-4 font-black uppercase tracking-widest text-[10px] md:text-xs hover:bg-black transition-colors border-2 border-black hard-shadow-sm flex items-center justify-center gap-2 shrink-0">
+                   <Instagram size={16} /> <span className="hidden md:inline">VIEW</span> INSTAGRAM
+                </a>
+             </div>
+          </div>
+       </div>
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 2. BLOCK LIST VIEW (AGENDA & ARCHIVES) - UPDATED
+// ==========================================
+function BlockListView({ title, events, theme }: { title: string, events: any[], theme: "vibrant" | "dark" }) {
+  const grouped = events.reduce((acc: any, event: any) => {
+    const dateStr = event.event_date.substring(0, 10);
+    if (!acc[dateStr]) acc[dateStr] = [];
+    acc[dateStr].push(event);
+    return acc;
+  }, {});
+  
+  const sortedDates = Object.keys(grouped).sort((a,b) => 
+    title === "ARCHIVE" ? new Date(b).getTime() - new Date(a).getTime() : new Date(a).getTime() - new Date(b).getTime()
+  );
+
+  return (
+    <div className={`w-full min-h-full pb-[60px] md:pb-12 ${theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-[#F0F0F0]'}`}>
+       
+       <div className={`fixed inset-0 playful-bg pointer-events-none z-0 ${theme === 'dark' ? 'opacity-10' : 'opacity-10'}`} />
+       <div className={`fixed inset-0 color-wash pointer-events-none z-0 ${theme === 'dark' ? 'opacity-10' : 'opacity-30'}`} />
+
+       <div className={`sticky top-0 z-50 border-b-2 border-black p-4 md:p-8 transition-colors shadow-md ${theme === 'dark' ? 'bg-[#1a1a1a]/95' : 'bg-[#F0F0F0]/95 backdrop-blur-md'}`}>
+          <h1 className={`font-black text-4xl md:text-7xl uppercase tracking-tighter leading-none ${theme === 'dark' ? 'text-white' : 'text-black drop-shadow-[3px_3px_0px_#fff]'}`}>
+             {title}
+          </h1>
+       </div>
+
+       <div className="flex flex-col relative z-10">
+          {sortedDates.map((date, dateIndex) => {
+             const headerBg = COLORS.dates[dateIndex % COLORS.dates.length];
+             const dateObj = new Date(date);
+
+             return (
+               <div key={date} className="relative">
+                  
+                  <div 
+                     className="sticky top-[73px] md:top-[138px] z-40 border-b-2 border-black py-2 px-3 md:px-6 flex justify-between items-center hard-shadow-date transition-transform"
+                     style={{ backgroundColor: headerBg }}
+                  >
+                     <div className="flex items-center gap-3">
+                        <div className="bg-white border-2 border-black px-2 py-0.5 md:py-1 font-black text-2xl md:text-3xl leading-none shadow-[2px_2px_0px_#000] -rotate-3 hover:rotate-0 transition-transform cursor-default">
+                           {dateObj.getDate()}
+                        </div>
+                        <div className="flex flex-col">
+                           <span className="font-black text-lg md:text-xl uppercase leading-none text-black">
+                              {dateObj.toLocaleDateString("en-US", { weekday: 'long' })}
+                           </span>
+                           <span className="font-mono font-bold text-[10px] md:text-xs uppercase leading-none text-black/70 mt-0.5">
+                              {dateObj.toLocaleDateString("en-US", { month: 'long' })}
+                           </span>
+                        </div>
+                     </div>
+                     <Star size={20} className="text-black opacity-30 animate-spin-slow hidden md:block" />
+                  </div>
+
+                  <div className={`grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-0 border-b-2 border-black`}>
+                     {grouped[date].map((e: any, i: number) => {
+                        const hoverBg = COLORS.cardHover[i % COLORS.cardHover.length];
+                        
+                        return (
+                          <a 
+                            key={i} 
+                            href={e.ig_post_url} 
+                            target="_blank" 
+                            className="group relative border-r-2 border-black bg-white flex flex-col h-full overflow-hidden hover:z-20"
+                          >
+                             <div className="w-full aspect-square border-b-2 border-black bg-[#E5E5E5] relative p-2 md:p-6 flex items-center justify-center overflow-hidden">
+                                <div className="absolute inset-0 pattern-grid opacity-[0.08]" />
+                                {e.image_url ? (
+                                  <img 
+                                     src={e.image_url} 
+                                     className="w-full h-full object-contain drop-shadow-[4px_4px_0px_rgba(0,0,0,0.6)] group-hover:scale-110 group-hover:rotate-1 transition-all duration-300 z-0" 
+                                     alt="Gig Poster" 
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center font-black text-black/20 text-xl -rotate-12 z-0">NO IMG</div>
+                                )}
+                                <div className="absolute top-2 left-2 md:top-3 md:left-3 bg-[#FF3D00] text-white border-2 border-black px-1.5 py-0.5 md:px-2 md:py-1 font-black text-[9px] md:text-sm uppercase shadow-[2px_2px_0px_#000] -rotate-3 group-hover:rotate-0 transition-transform z-10">
+                                   {e.club_name}
+                                </div>
+                             </div>
+
+                             <div 
+                                className="p-3 md:p-5 flex-1 flex flex-col justify-between relative transition-colors duration-200"
+                                style={{ backgroundColor: 'white' }}
+                             >
+                                <div 
+                                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-0" 
+                                  style={{ backgroundColor: hoverBg }} 
+                                />
+                                <div className="relative z-10 flex flex-col h-full">
+                                  <h3 className="font-black text-sm md:text-xl uppercase leading-[1.1] mb-2 md:mb-4 group-hover:text-black line-clamp-2">
+                                     {e.event_name || "CLUB NIGHT"}
+                                  </h3>
+                                  
+                                  <div className="flex flex-wrap gap-1.5 mt-auto">
+                                     {e.dj_names.map((dj: string, idx: number) => (
+                                        <span key={idx} className="bg-black text-white px-1.5 py-[2px] md:px-2 md:py-1 font-mono font-bold text-[9px] md:text-[11px] uppercase border border-transparent group-hover:border-black group-hover:shadow-[1px_1px_0px_#000]">
+                                           {dj}
+                                        </span>
+                                     ))}
+                                  </div>
+                                </div>
+                             </div>
+                          </a>
+                        );
+                     })}
+                  </div>
+               </div>
+             );
+          })}
+       </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 3. MAP VIEW
+// ==========================================
+function MapView({ isLoaded }: { isLoaded: boolean }) {
+  const [selected, setSelected] = useState<any>(null);
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full relative">
+       <div className="absolute inset-0 playful-bg opacity-10 bg-white pointer-events-none" />
+
+       {!isLoaded ? <div className="w-full h-full flex items-center justify-center font-black text-3xl">LOADING SECTOR...</div> : (
+         <GoogleMap 
+           mapContainerClassName="w-full h-full" 
+           center={POBLACION_CENTER} zoom={17} 
+           options={{ styles: popMapStyle, disableDefaultUI: true, clickableIcons: false }} 
+           onClick={() => setSelected(null)}
+         >
+            {POBLACION_BARS.map((bar, i) => (
+               <Marker 
+                 key={i} position={bar} 
+                 icon={{ 
+                   path: typeof window !== "undefined" ? window.google.maps.SymbolPath.CIRCLE : 0, 
+                   fillColor: selected?.name === bar.name ? "#FF3D00" : "#000000", 
+                   fillOpacity: 1, scale: 12, strokeColor: "#ffffff", strokeWeight: 3
+                 }} 
+                 onClick={() => setSelected(bar)} 
+               />
+            ))}
+         </GoogleMap>
+       )}
+       
+       <AnimatePresence>
+         {selected && (
+            <motion.div 
+               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+               className="absolute bottom-16 md:bottom-8 left-4 md:left-8 right-4 md:w-[400px] bg-white border-2 border-black hard-shadow p-6 z-30"
+            >
+               <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-black text-2xl md:text-3xl uppercase leading-none">{selected.name}</h3>
+                  <button onClick={() => setSelected(null)}><X size={24} className="border-2 border-black hover:bg-[#FF3D00] transition-colors" /></button>
+               </div>
+               <div className="flex gap-2 mb-4">
+                  <div className="bg-[#00E5FF] px-2 py-1 font-mono text-xs font-bold border-2 border-black uppercase hard-shadow-sm">
+                      {selected.type}
+                  </div>
+                  <div className="bg-[#76FF03] px-2 py-1 font-mono text-xs font-bold border-2 border-black uppercase hard-shadow-sm">
+                      UNTIL {selected.status}
+                  </div>
+               </div>
+               <a href={`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lng}`} target="_blank" className="block w-full text-center py-3 bg-black text-white font-bold uppercase hover:bg-[#FF3D00] border-2 border-black transition-colors">
+                  NAVIGATE TO SECTOR
+               </a>
+            </motion.div>
+         )}
+       </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ==========================================
+// UTILITIES
+// ==========================================
+
+function SidebarLink({ label, sub, active, onClick, color, icon }: any) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`
+        w-full p-6 text-left border-b-2 border-black transition-all group relative overflow-hidden flex items-center justify-between
+        ${active ? 'bg-black text-white' : 'bg-white hover:bg-[#F0F0F0]'}
+      `}
+    >
+      <div className={`absolute left-0 top-0 bottom-0 w-2 transition-all duration-300 ${active ? 'w-full opacity-10' : 'w-3'}`} style={{ backgroundColor: color }} />
+      <div className="relative z-10 pl-4">
+         <h3 className="font-black text-2xl uppercase leading-none mb-1 group-hover:translate-x-1 transition-transform">{label}</h3>
+         <p className={`font-mono text-[10px] font-bold tracking-widest uppercase opacity-60`}>{sub}</p>
+      </div>
+      <div className={`relative z-10 transform transition-transform ${active ? 'rotate-12 scale-125' : 'group-hover:rotate-12'}`} style={{ color: active ? color : 'black' }}>
+        {icon}
+      </div>
+    </button>
+  );
+}
+
+function MobileNavBtn({ icon, active, onClick }: any) {
+  return (
+    <button onClick={onClick} className={`flex-1 flex items-center justify-center transition-colors ${active ? 'bg-[#FFEB3B] text-black shadow-[inset_0px_4px_0px_#000]' : 'bg-white text-black hover:bg-gray-100'}`}>
+       <div className={`transform transition-transform ${active ? 'scale-125' : 'scale-100'}`}>
+         {icon}
+       </div>
+    </button>
+  );
+}
+
+function Marquee({ text }: { text: string }) {
+  return (
+    <div className="relative w-full overflow-hidden whitespace-nowrap">
+      <div className="animate-marquee inline-block font-mono font-bold text-[10px] md:text-xs">
+        {text.repeat(10)}
+      </div>
+      <style>{`
+        .animate-marquee { animation: marquee 15s linear infinite; }
+        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+      `}</style>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center bg-[#FFEB3B] p-8 text-center border-2 border-black m-4 hard-shadow">
+      <h1 className="font-black text-2xl md:text-4xl uppercase mb-2">NO SIGNAL</h1>
+      <p className="font-mono font-bold text-xs md:text-sm">Check back later or view the Agenda.</p>
+    </div>
+  );
+}

@@ -18,7 +18,7 @@ const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
 // 2026 Model: Gemini 3.1 Flash-Lite
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-const TARGET_ACCOUNTS = ["kampaiph"]; 
+const TARGET_ACCOUNTS = ["kampaiph", "apothekamanila", "openhouse.world","xinchaomnl","umaafterdark"]; 
 const NEXT_JS_API_URL = process.env.PRODUCTION_URL || "http://localhost:3000";
 const CRON_SECRET = process.env.CRON_SECRET;
 
