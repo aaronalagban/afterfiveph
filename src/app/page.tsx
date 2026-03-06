@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase-client";
 import { MapPin, ArrowUpRight, ArrowRight } from "lucide-react";
 import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
 
@@ -56,8 +56,10 @@ export default function AppFeed() {
   const[loading, setLoading] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
 
+  const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
   const { isLoaded: isMapLoaded } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string,
+    googleMapsApiKey: googleMapsKey || "",
   });
 
   useEffect(() => {
