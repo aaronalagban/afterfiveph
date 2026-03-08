@@ -238,7 +238,7 @@ const getLogicalToday = () => {
                 AfterFive is currently in beta. If you have any suggestions or find bugs, feel free to slide into my DMs:
                 <a href="https://instagram.com/aaronalagbann" target="_blank" className="text-[#FF3D00] font-bold block mt-2 hover:underline">@aaronalagbann</a>
                 <span className="block mt-4">Currently tracking venues:</span>
-                <span className="block mt-3 text-neutral-400">Kampai • Apotheka Manila • Open House • Uma After Dark</span>
+                <span className="block mt-3 text-neutral-400">Kampai • Apotheka Manila • Open House World • Uma After Dark • Electric Sala • Ugly Duck</span>
                 <span className="block mt-4 text-neutral-500 text-xs">Some events may not appear yet due to current automation limits.</span>
               </p>
               <button 
