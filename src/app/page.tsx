@@ -430,13 +430,13 @@ function GalleryView({ events }: { events: any[] }) {
                   </div>
 
                   <div className="flex flex-wrap gap-1 md:gap-2 mt-2">
-                     {/* SAFETY FIX: Added fallback to prevent array slice crash */}
-                     {(activeEvent.dj_names || []).slice(0, 4).map((dj: string, i: number) => (
-                        <span key={i} className="bg-black text-white px-1.5 py-0.5 font-mono font-bold text-[9px] md:text-xs uppercase border border-black shadow-[2px_2px_0px_#00E5FF]">
-                           {dj}
-                        </span>
-                     ))}
-                    </div>
+   {/* SAFETY FIX: Added fallback to prevent array map crash */}
+   {(activeEvent.dj_names || []).map((dj: string, i: number) => (
+      <span key={i} className="bg-black text-white px-1.5 py-0.5 font-mono font-bold text-[9px] md:text-xs uppercase border border-black shadow-[2px_2px_0px_#00E5FF]">
+         {dj}
+      </span>
+   ))}
+</div>
                 </div>
 
                 <a href={activeEvent.ig_post_url} target="_blank" className="bg-[#FF3D00] text-white px-4 py-3 md:px-6 md:py-4 font-black uppercase tracking-widest text-[10px] md:text-xs hover:bg-black transition-colors border-2 border-black hard-shadow-sm flex items-center justify-center gap-2 shrink-0">
