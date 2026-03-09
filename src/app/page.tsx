@@ -25,24 +25,24 @@ const TAB_VARIANTS = {
 
 const POBLACION_CENTER = { lat: 14.5648, lng: 121.0318 };
 const POBLACION_BARS = [
-  { name: "Kampai", lat: 14.56396, lng: 121.03162, type: "Listening Bar", status: "03:00" },
-  { name: "Apotheka Manila", lat: 14.56462, lng: 121.03214, type: "Club", status: "04:00" },
-  { name: "Open House", lat: 14.56438, lng: 121.03177, type: "Listening Bar", status: "02:00" },
-  { name: "Uma After Dark", lat: 14.56509, lng: 121.03147, type: "Club", status: "03:00" },
-  { name: "Z Hostel Roofdeck", lat: 14.56547, lng: 121.03196, type: "Rooftop", status: "02:00" },
-  { name: "Run Rabbit Run", lat: 14.56410, lng: 121.03230, type: "Speakeasy", status: "01:00" },
-  { name: "OTO", lat: 14.56447, lng: 121.03089, type: "Hi-Fi Bar", status: "02:00" },
-  { name: "Agimat", lat: 14.56431, lng: 121.03256, type: "Cocktail Bar", status: "02:00" },
-  { name: "Spirits Library", lat: 14.56578, lng: 121.03183, type: "Cocktail Bar", status: "03:00" },
-  { name: "Alamat", lat: 14.56484, lng: 121.03163, type: "Bar", status: "02:00" },
-  { name: "Ugly Duck", lat: 14.56466, lng: 121.03209, type: "Tapas Bar", status: "02:00" },
-  { name: "Buccaneers Rum & Kitchen", lat: 14.56521, lng: 121.03228, type: "Rum Bar", status: "02:00" },
-  { name: "Japonesa", lat: 14.56502, lng: 121.03199, type: "Bar", status: "02:00" },
-  { name: "Polilya", lat: 14.56473, lng: 121.03071, type: "Restaurant Bar", status: "00:00" },
-  { name: "Funky Monkey", lat: 14.56407, lng: 121.03011, type: "Bar", status: "02:00" },
-  { name: "Almacen", lat: 14.56429, lng: 121.03112, type: "Bar", status: "02:00" },
-  { name: "The Way Out", lat: 14.56495, lng: 121.03243, type: "Club", status: "03:00" },
-  { name: "WYP (What's Your Poison)", lat: 14.56562, lng: 121.03102, type: "Cocktail Bar", status: "02:00" }
+  { name: "Kampai", lat: 14.56420, lng: 121.03163, type: "Listening Bar", status: "03:00" },
+  { name: "Apotheka Manila", lat: 14.56471, lng: 121.03234, type: "Club", status: "04:00" },
+  { name: "Open House World", lat: 14.55869, lng: 121.02443, type: "Listening Bar", status: "02:00" },
+  { name: "Uma After Dark", lat: 14.56515, lng: 121.03152, type: "Club", status: "03:00" },
+  { name: "Z Hostel Roofdeck", lat: 14.56550, lng: 121.03193, type: "Rooftop", status: "02:00" },
+  { name: "Run Rabbit Run", lat: 14.56405, lng: 121.03224, type: "Speakeasy", status: "01:00" },
+  { name: "OTO", lat: 14.56449, lng: 121.03080, type: "Hi-Fi Bar", status: "02:00" },
+  { name: "Agimat", lat: 14.56430, lng: 121.03255, type: "Cocktail Bar", status: "02:00" },
+  { name: "Spirits Library", lat: 14.56575, lng: 121.03178, type: "Cocktail Bar", status: "03:00" },
+  { name: "Alamat", lat: 14.56482, lng: 121.03163, type: "Bar", status: "02:00" },
+  { name: "Ugly Duck", lat: 14.56468, lng: 121.03209, type: "Tapas Bar", status: "02:00" },
+  { name: "Buccaneers Rum & Kitchen", lat: 14.56523, lng: 121.03231, type: "Rum Bar", status: "02:00" },
+  { name: "Japonesa", lat: 14.56503, lng: 121.03199, type: "Bar", status: "02:00" },
+  { name: "Polilya", lat: 14.56473, lng: 121.03069, type: "Restaurant Bar", status: "00:00" },
+  { name: "Funky Monkey", lat: 14.56408, lng: 121.03012, type: "Bar", status: "02:00" },
+  { name: "Almacen", lat: 14.56432, lng: 121.03115, type: "Bar", status: "02:00" },
+  { name: "The Way Out", lat: 14.56496, lng: 121.03245, type: "Club", status: "03:00" },
+  { name: "WYP (What's Your Poison)", lat: 14.56560, lng: 121.03103, type: "Cocktail Bar", status: "02:00" }
 ];
 
 const popMapStyle = [
@@ -139,13 +139,60 @@ export default function AfterFivePop() {
     return () => clearTimeout(timer);
   }, []);
 
-const getLogicalToday = () => {
+  const getLogicalToday = () => {
     const now = new Date();
-    now.setHours(now.getHours() - 5);
-    return now.toISOString().split('T')[0];
+    
+    // 1. Force the current time into Manila's timezone
+    const manilaTimeStr = now.toLocaleString("en-US", { timeZone: "Asia/Manila" });
+    
+    // 2. Create a new Date object based strictly on Manila time
+    const manilaDate = new Date(manilaTimeStr);
+    
+    // 3. Subtract 5 hours (4:59 AM still counts as yesterday's nightlife)
+    manilaDate.setHours(manilaDate.getHours() - 5);
+    
+    // 4. Format manually to YYYY-MM-DD to avoid .toISOString() reverting it to UTC
+    const year = manilaDate.getFullYear();
+    const month = String(manilaDate.getMonth() + 1).padStart(2, '0');
+    const day = String(manilaDate.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
   };
 
-  const today = getLogicalToday();
+  const [today, setToday] = useState(getLogicalToday());
+
+  useEffect(() => {
+    const getMsUntilNext5AM = () => {
+      const now = new Date();
+      const manilaTimeStr = now.toLocaleString("en-US", { timeZone: "Asia/Manila" });
+      const manilaNow = new Date(manilaTimeStr);
+
+      const next5AM = new Date(manilaNow);
+      next5AM.setHours(5, 0, 0, 0);
+
+      // If it's already past 5 AM today, schedule for 5 AM tomorrow
+      if (manilaNow.getTime() >= next5AM.getTime()) {
+        next5AM.setDate(next5AM.getDate() + 1);
+      }
+
+      return next5AM.getTime() - manilaNow.getTime();
+    };
+
+    let timeoutId: NodeJS.Timeout;
+
+    const scheduleRefresh = () => {
+      const msUntil5AM = getMsUntilNext5AM();
+      timeoutId = setTimeout(() => {
+        setToday(getLogicalToday()); // Triggers a re-render with the new day
+        scheduleRefresh(); // Queue the next day's refresh
+      }, msUntil5AM);
+    };
+
+    scheduleRefresh();
+
+    return () => clearTimeout(timeoutId);
+  }, []);
+
   const normalizeDbDate = (d: string) => d?.substring(0, 10).replace(/[ /]/g, "-") || "";
   
   const tonightEvents = events.filter((e) => normalizeDbDate(e.event_date) === today);
@@ -372,7 +419,7 @@ function GalleryView({ events }: { events: any[] }) {
                     {title.length > 25 ? (
                       <div className="whitespace-nowrap overflow-hidden">
                          <h2 className="animate-marquee-title font-black text-3xl md:text-7xl uppercase text-black">
-                            {title}  ///  {title}  ///  
+                            {title}  ///  {title}  ///  
                          </h2>
                       </div>
                     ) : (
