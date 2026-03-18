@@ -1,28 +1,27 @@
 // src/utils/manualSubmissionServer.js
 import { createClient } from "@supabase/supabase-js";
-import dotenv from "dotenv";
 
-// Ensure dotenv is configured if this script is run standalone or in a non-Next.js environment
-// Next.js handles .env files automatically for API routes, but good practice for server utils.
-if (typeof process.env.NEXT_PUBLIC_SUPABASE_URL === 'undefined') {
-  dotenv.config({ path: ".env.local" });
+/* ---------------------------
+HELPER: GET ADMIN CLIENT
+--------------------------- */
+function getAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Supabase configuration missing in environment variables.");
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey);
 }
 
 /* ---------------------------
-SUPABASE
+INSERT EVENT logic
 --------------------------- */
-
-// Use the service role key for server-side operations
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-/* ---------------------------
-INSERT EVENT (Simplified for manual)
---------------------------- */
-
 async function insertManualEvent(event) {
+  // Initialize client here so it doesn't crash the build
+  const supabase = getAdminClient();
+
   const { data: existing, error: lookupError } = await supabase
     .from("events")
     .select("id, source_priority")
@@ -35,12 +34,11 @@ async function insertManualEvent(event) {
     throw new Error("Database lookup failed.");
   }
 
-  // Manual submissions will have a higher priority to override scraped data
   const MANUAL_PRIORITY = 100;
   event.source_priority = MANUAL_PRIORITY;
 
   if (existing) {
-    if (MANUAL_PRIORITY > existing.source_priority) {
+    if (MANUAL_PRIORITY > (existing.source_priority || 0)) {
       const { error: updateError } = await supabase
         .from("events")
         .update(event)
@@ -53,19 +51,18 @@ async function insertManualEvent(event) {
         console.log(`🔁 Event updated: Manual submission for ${event.club_name} on ${event.event_date}`);
       }
     } else {
-      console.log(`⏩ Existing event kept for ${event.event_date} (higher/equal priority already exists)`);
+      console.log(`⏩ Existing event kept (higher/equal priority already exists)`);
     }
   } else {
-    const { data, error } = await supabase
+    const { error: insertError } = await supabase
       .from("events")
-      .insert(event)
-      .select();
+      .insert(event);
 
-    if (error) {
-      console.error("❌ INSERT FAILED:", error);
+    if (insertError) {
+      console.error("❌ INSERT FAILED:", insertError);
       throw new Error("Failed to insert new event.");
     } else {
-      console.log(`📡 DB Insert SUCCESS for ${event.event_name} on ${event.event_date}`);
+      console.log(`📡 DB Insert SUCCESS for ${event.event_name}`);
     }
   }
 }
@@ -73,17 +70,16 @@ async function insertManualEvent(event) {
 /* ---------------------------
 MAIN MANUAL SUBMISSION FUNCTION
 --------------------------- */
-
 export async function submitManualEvent(
   eventName,
   djsString,
   eventDate,
   clubName,
   igPostUrl,
-  imageUrl // Parameter for the flyer image URL
+  imageUrl 
 ) {
   if (!eventName || !eventDate || !clubName || !igPostUrl || !imageUrl) {
-    throw new Error("Missing required event details: event name, date, club, IG post URL, or image URL.");
+    throw new Error("Missing required event details.");
   }
 
   const djsArray = djsString ? djsString.split(",").map(dj => dj.trim()).filter(Boolean) : [];
@@ -93,12 +89,12 @@ export async function submitManualEvent(
     event_name: eventName,
     dj_name: djNameForDisplay,
     club_name: clubName,
-    city: "Makati", // Assuming Makati
+    city: "Makati",
     event_date: eventDate,
     image_url: imageUrl,
     ig_post_url: igPostUrl,
     djs: djsArray,
-    source_priority: 100 // High priority for manual entries
+    source_priority: 100 
   };
 
   await insertManualEvent(event);
