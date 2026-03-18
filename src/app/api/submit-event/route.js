@@ -21,13 +21,15 @@ export async function POST(request) {
 
     // 3. Parse FormData
     const formData = await request.formData();
-    const password = formData.get('password');
+const password = formData.get('password');
 
-    // 4. Verify Password
-    if (password !== process.env.ADMIN_PASSWORD) {
-      console.error("❌ Incorrect Password Attempt");
-      return NextResponse.json({ message: "Unauthorized: Incorrect Password" }, { status: 401 });
-    }
+// Verify against the server-side env variable
+const correctPassword = process.env.ADMIN_PASSWORD || "afterfive";
+
+if (password !== correctPassword) {
+  console.error("❌ Incorrect Password Attempt");
+  return NextResponse.json({ message: "Unauthorized: Incorrect Password" }, { status: 401 });
+}
 
     const eventName = formData.get('eventName');
     const djs = formData.get('djs');

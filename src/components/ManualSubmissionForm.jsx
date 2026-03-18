@@ -75,13 +75,15 @@ export default function ManualSubmissionForm() {
   };
 
   const handleNext = () => {
-    if (!canGoNext()) return;
+     if (!canGoNext()) return;
 
     // STEP 0: Password Check Flow
     if (step === 0) {
+      // It looks for NEXT_PUBLIC_ADMIN_PASSWORD first, then falls back to "afterfive"
       const correctPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "afterfive";
       
       if (password !== correctPassword) {
+        console.log("Login Failed. Input:", password);
         const newCount = failedAttempts + 1;
         setFailedAttempts(newCount);
 
@@ -91,13 +93,15 @@ export default function ManualSubmissionForm() {
           setMessage({ type: 'error', text: "Just DM @aaronalagbann (Instagram) for the password" });
         }
         return; 
+      } else {
+        console.log("Login Success!");
       }
     }
 
     setDirection(1);
     setStep((s) => s + 1);
     setMessage(null);
-    setFailedAttempts(0); // Reset on success
+    setFailedAttempts(0); 
   };
 
   const handlePrev = () => {
