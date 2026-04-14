@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { ApifyClient } from "apify-client";
 
 function getAdminClient() {
   return createClient(
@@ -23,7 +22,7 @@ async function hostImage(supabase, buffer, clubName) {
 
 export async function approveAndScrapeEvent(pendingEventId) {
   const supabase = getAdminClient();
-  const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
+  const apifyToken = process.env.APIFY_API_TOKEN;
 
   // 1. Fetch the pending event data
   const { data: pendingEvent, error: fetchError } = await supabase
@@ -36,13 +35,26 @@ export async function approveAndScrapeEvent(pendingEventId) {
 
   console.log(`🔍 Scraping IG Post: ${pendingEvent.ig_post_url}`);
 
-  // 2. Scrape IG for the image
-  const apifyRun = await apifyClient.actor("apify/instagram-scraper").call({
-    directUrls: [pendingEvent.ig_post_url],
-    resultsType: "details"
-  });
+  // 2. Direct REST API Call to Apify (Bypasses the buggy apify-client package)
+  const apifyRes = await fetch(
+    `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${apifyToken}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        directUrls: [pendingEvent.ig_post_url],
+        resultsType: "details"
+      }),
+    }
+  );
 
-  const { items } = await apifyClient.dataset(apifyRun.defaultDatasetId).listItems();
+  if (!apifyRes.ok) {
+    const errorText = await apifyRes.text();
+    throw new Error(`Apify API Error: ${errorText}`);
+  }
+
+  const items = await apifyRes.json();
+
   if (!items || items.length === 0) throw new Error("Failed to scrape IG post.");
 
   const postData = items[0];
@@ -50,9 +62,13 @@ export async function approveAndScrapeEvent(pendingEventId) {
 
   if (!rawImageUrl) throw new Error("Could not extract image from post.");
 
+  console.log("📥 Downloading image...");
+
   // 3. Download and Upload Image
   const imgRes = await fetch(rawImageUrl);
   const buffer = Buffer.from(await imgRes.arrayBuffer());
+  
+  console.log("☁️ Uploading to Supabase...");
   const finalImageUrl = await hostImage(supabase, buffer, pendingEvent.club_name);
 
   // 4. Insert into LIVE events table
@@ -60,6 +76,7 @@ export async function approveAndScrapeEvent(pendingEventId) {
     ? pendingEvent.djs.join(", ") 
     : "Various Artists";
 
+  console.log("✅ Pushing to Live Events Table...");
   const { error: insertError } = await supabase.from('events').insert({
     event_name: pendingEvent.event_name,
     dj_name: djNameForDisplay,
@@ -72,7 +89,7 @@ export async function approveAndScrapeEvent(pendingEventId) {
     source_priority: 100 // Top priority since a human approved it
   });
 
-  if (insertError) throw new Error("Failed to insert into live events");
+  if (insertError) throw new Error(`Live DB Insert Error: ${insertError.message}`);
 
   // 5. Mark pending as approved
   await supabase.from('pending_events').update({ status: 'approved' }).eq('id', pendingEventId);
