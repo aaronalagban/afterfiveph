@@ -1,102 +1,87 @@
-// src/utils/manualSubmissionServer.js
 import { createClient } from "@supabase/supabase-js";
+import { ApifyClient } from "apify-client";
 
-/* ---------------------------
-HELPER: GET ADMIN CLIENT
---------------------------- */
 function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Supabase configuration missing in environment variables.");
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey);
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
 }
 
-/* ---------------------------
-INSERT EVENT logic
---------------------------- */
-async function insertManualEvent(event) {
-  // Initialize client here so it doesn't crash the build
+async function hostImage(supabase, buffer, clubName) {
+  const safeClubName = clubName.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  const fileName = `approved-${safeClubName}-${Date.now()}.jpg`;
+
+  const { error } = await supabase.storage.from("event-flyers").upload(fileName, buffer, {
+    contentType: "image/jpeg",
+    upsert: true
+  });
+
+  if (error) throw new Error(`Storage Error: ${error.message}`);
+  return supabase.storage.from("event-flyers").getPublicUrl(fileName).data.publicUrl;
+}
+
+export async function approveAndScrapeEvent(pendingEventId) {
   const supabase = getAdminClient();
+  const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
 
-  const { data: existing, error: lookupError } = await supabase
-    .from("events")
-    .select("id, source_priority")
-    .eq("club_name", event.club_name)
-    .eq("event_date", event.event_date)
-    .maybeSingle();
+  // 1. Fetch the pending event data
+  const { data: pendingEvent, error: fetchError } = await supabase
+    .from('pending_events')
+    .select('*')
+    .eq('id', pendingEventId)
+    .single();
 
-  if (lookupError) {
-    console.error("❌ Lookup error:", lookupError);
-    throw new Error("Database lookup failed.");
-  }
+  if (fetchError || !pendingEvent) throw new Error("Pending event not found");
 
-  const MANUAL_PRIORITY = 100;
-  event.source_priority = MANUAL_PRIORITY;
+  console.log(`🔍 Scraping IG Post: ${pendingEvent.ig_post_url}`);
 
-  if (existing) {
-    if (MANUAL_PRIORITY > (existing.source_priority || 0)) {
-      const { error: updateError } = await supabase
-        .from("events")
-        .update(event)
-        .eq("id", existing.id);
+  // 2. Scrape IG for the image
+  const apifyRun = await apifyClient.actor("apify/instagram-scraper").call({
+    directUrls: [pendingEvent.ig_post_url],
+    resultsType: "details"
+  });
 
-      if (updateError) {
-        console.error("❌ Update error:", updateError);
-        throw new Error("Failed to update existing event.");
-      } else {
-        console.log(`🔁 Event updated: Manual submission for ${event.club_name} on ${event.event_date}`);
-      }
-    } else {
-      console.log(`⏩ Existing event kept (higher/equal priority already exists)`);
-    }
-  } else {
-    const { error: insertError } = await supabase
-      .from("events")
-      .insert(event);
+  const { items } = await apifyClient.dataset(apifyRun.defaultDatasetId).listItems();
+  if (!items || items.length === 0) throw new Error("Failed to scrape IG post.");
 
-    if (insertError) {
-      console.error("❌ INSERT FAILED:", insertError);
-      throw new Error("Failed to insert new event.");
-    } else {
-      console.log(`📡 DB Insert SUCCESS for ${event.event_name}`);
-    }
-  }
+  const postData = items[0];
+  const rawImageUrl = postData.displayUrl || (postData.childPosts && postData.childPosts[0]?.displayUrl);
+
+  if (!rawImageUrl) throw new Error("Could not extract image from post.");
+
+  // 3. Download and Upload Image
+  const imgRes = await fetch(rawImageUrl);
+  const buffer = Buffer.from(await imgRes.arrayBuffer());
+  const finalImageUrl = await hostImage(supabase, buffer, pendingEvent.club_name);
+
+  // 4. Insert into LIVE events table
+  const djNameForDisplay = pendingEvent.djs && pendingEvent.djs.length > 0 
+    ? pendingEvent.djs.join(", ") 
+    : "Various Artists";
+
+  const { error: insertError } = await supabase.from('events').insert({
+    event_name: pendingEvent.event_name,
+    dj_name: djNameForDisplay,
+    club_name: pendingEvent.club_name,
+    city: "Makati",
+    event_date: pendingEvent.event_date,
+    image_url: finalImageUrl,
+    ig_post_url: pendingEvent.ig_post_url,
+    djs: pendingEvent.djs,
+    source_priority: 100 // Top priority since a human approved it
+  });
+
+  if (insertError) throw new Error("Failed to insert into live events");
+
+  // 5. Mark pending as approved
+  await supabase.from('pending_events').update({ status: 'approved' }).eq('id', pendingEventId);
+
+  return { success: true };
 }
 
-/* ---------------------------
-MAIN MANUAL SUBMISSION FUNCTION
---------------------------- */
-export async function submitManualEvent(
-  eventName,
-  djsString,
-  eventDate,
-  clubName,
-  igPostUrl,
-  imageUrl 
-) {
-  if (!eventName || !eventDate || !clubName || !igPostUrl || !imageUrl) {
-    throw new Error("Missing required event details.");
-  }
-
-  const djsArray = djsString ? djsString.split(",").map(dj => dj.trim()).filter(Boolean) : [];
-  const djNameForDisplay = djsArray.length > 0 ? djsArray.join(", ") : "Various Artists";
-
-  const event = {
-    event_name: eventName,
-    dj_name: djNameForDisplay,
-    club_name: clubName,
-    city: "Makati",
-    event_date: eventDate,
-    image_url: imageUrl,
-    ig_post_url: igPostUrl,
-    djs: djsArray,
-    source_priority: 100 
-  };
-
-  await insertManualEvent(event);
-  return { success: true, message: "Manual event submitted successfully!" };
+export async function rejectEvent(pendingEventId) {
+  const supabase = getAdminClient();
+  await supabase.from('pending_events').update({ status: 'rejected' }).eq('id', pendingEventId);
+  return { success: true };
 }

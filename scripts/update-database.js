@@ -34,13 +34,12 @@ TARGET CLUBS
 --------------------------- */
 
 const TARGET_ACCOUNTS = [
+  "annexhousemanila",
   "kampaiph",
   "apothekamanila",
   "openhouse.world",
   "umaafterdark",
-  "uglyduckpoblacion",
-  "electric.sala",
-  "annexhousemanila"
+  "uglyduckpoblacion"
 ];
 
 /* ---------------------------
@@ -69,18 +68,20 @@ async function hostImage(buffer, username) {
 DATE FILTER
 --------------------------- */
 
-// Reverted back to nearest Monday logic
 function isFromThisWeek(dateString) {
   const postDate = new Date(dateString);
   const today = new Date();
-  const dayOfWeek = today.getDay();
+  
+  // getDay() returns 0 for Sunday, 1 for Monday, etc.
+  const dayOfWeek = today.getDay(); 
 
-  // Looks back to the nearest Monday
-  const diffToMonday = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-  const monday = new Date(today.setDate(diffToMonday));
-  monday.setHours(0, 0, 0, 0);
+  // Subtracting the current dayOfWeek exactly lands on the most recent Sunday.
+  // (If today is Wednesday(3), it subtracts 3 days. If today is Sunday(0), it subtracts 0 days).
+  const diffToSunday = today.getDate() - dayOfWeek;
+  const lastSunday = new Date(today.setDate(diffToSunday));
+  lastSunday.setHours(0, 0, 0, 0);
 
-  return postDate >= monday;
+  return postDate >= lastSunday;
 }
 
 /* ---------------------------
@@ -107,7 +108,7 @@ function captionScore(caption) {
 }
 
 /* ---------------------------
-OCR
+OCR & AI HELPERS
 --------------------------- */
 
 async function extractText(buffer) {
@@ -123,10 +124,17 @@ function looksLikePoster(text) {
   const keywords = [
     "dj", "lineup", "friday", "saturday", "tonight", "doors", "pm", "guest",
     "live", "acoustic", "band", "music", "schedule", "gig", "session", "presents",
-    "wednesday", "thursday", "sunday", "b2b", "feat", "featuring", "resident", 
-    "presale", "entrance", "table reservations", "afrobeats", "techno", "house", "vinyl"
+    "wednesday", "thursday", "sunday", "b2b", "feat", "featuring", "resident"
   ];
   return keywords.some(k => text.includes(k));
+}
+
+function safeJSON(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 /* ---------------------------
@@ -154,46 +162,34 @@ async function loadKnownDJs() {
   return Array.from(set);
 }
 
-/* ---------------------------
-DJ DETECTION
---------------------------- */
-
 function detectKnownDJ(text, knownDJs) {
   text = text.toLowerCase();
   return knownDJs.some(dj => text.includes(dj));
 }
 
 /* ---------------------------
-SAFE JSON
---------------------------- */
-
-function safeJSON(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-/* ---------------------------
-INSERT EVENT
+INSERT EVENT (Database)
 --------------------------- */
 
 async function insertEvent(event) {
-  const { data: existing, error: lookupError } = await supabase
+  // Switched to .limit(1) instead of .maybeSingle() to prevent database crashes if duplicates already exist
+  const { data: existingRecords, error: lookupError } = await supabase
     .from("events")
     .select("id, source_priority")
     .eq("club_name", event.club_name)
     .eq("event_date", event.event_date)
-    .maybeSingle();
+    .limit(1);
 
   if (lookupError) {
     console.log("❌ Lookup error:", lookupError);
     return;
   }
 
-  if (existing) {
-    if (event.source_priority > existing.source_priority) {
+  if (existingRecords && existingRecords.length > 0) {
+    const existing = existingRecords[0];
+    const existingPriority = existing.source_priority || 0; // Treat null as 0
+
+    if (event.source_priority > existingPriority) {
       const { error: updateError } = await supabase
         .from("events")
         .update(event)
@@ -202,16 +198,15 @@ async function insertEvent(event) {
       if (updateError) {
         console.log("❌ Update error:", updateError);
       } else {
-        console.log(`🔁 Event updated: Better flyer found for ${event.club_name} on ${event.event_date}`);
+        console.log(`🔁 Event updated: Better dedicated flyer found for ${event.club_name} on ${event.event_date}`);
       }
     } else {
-      console.log(`⏩ Existing event kept for ${event.event_date} (lower/equal priority)`);
+      console.log(`⏩ Event skipped for ${event.event_date} (Already have an equal or better flyer)`);
     }
   } else {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("events")
-      .insert(event)
-      .select();
+      .insert(event);
 
     if (error) {
       console.log("❌ INSERT FAILED:", error);
@@ -228,7 +223,6 @@ SCRAPER
 async function run() {
   console.log("🚀 AfterFive Scraper Starting");
 
-  // Get current date string for Gemini context
   const todayString = new Date().toISOString().split("T")[0];
 
   try {
@@ -254,7 +248,6 @@ async function run() {
       try {
         const username = post.ownerUsername || post.username || "unknown";
 
-        // Only checking posts from this week (Monday onwards)
         if (!isFromThisWeek(post.timestamp)) continue;
 
         let images = [];
@@ -265,15 +258,15 @@ async function run() {
         }
 
         const score = captionScore(post.caption);
-        console.log(`🔍 ${username} | score ${score} | images: ${images.length}`);
+        console.log(`\n🔍 Analyzing Post: ${username} | Score ${score} | Images: ${images.length}`);
+
+        // CAROUSEL MEMORY: We will hold the best events from this post before pushing to Supabase
+        const bestEventsForThisPost = {};
 
         for (let i = 0; i < images.length; i++) {
           const imageUrl = images[i];
           const imgRes = await fetch(imageUrl);
           const buffer = Buffer.from(await imgRes.arrayBuffer());
-
-          // Dynamic Priorities based on carousel position
-          const sourcePriority = images.length === 1 ? 10 : (i === 0 ? 1 : 5);
 
           let shouldRunAI = false;
 
@@ -283,27 +276,24 @@ async function run() {
             const text = await extractText(buffer);
             if (looksLikePoster(text) || detectKnownDJ(text, knownDJs)) {
               shouldRunAI = true;
-            } else {
-              continue;
             }
           }
 
           if (!shouldRunAI) continue;
 
-          // FIX: Injected today's date into the prompt so the AI accurately maps the year
           const prompt = `
-            You are an expert nightlife and live music scout. Analyze this flyer. It may be a single event poster, or a weekly schedule containing multiple events.
+            You are an expert nightlife scout. Analyze this flyer.
 
             CRITICAL DATE INSTRUCTION:
-            Today's date is ${todayString}. Flyers usually do not mention the year. You must ensure the "event_date" is in the near future relative to today. Do NOT use past years like 2024. Format strictly as YYYY-MM-DD.
+            Today's date is ${todayString}. Format strictly as YYYY-MM-DD. DO NOT use past years.
 
             CRITICAL EVENT INSTRUCTIONS:
-            1. Extract events ONLY if they feature DJs, live music, acoustic bands, or nightlife/clubbing.
-            2. STRICTLY IGNORE food promos, drink specials, happy hours, or meal menus UNLESS a specific DJ or live musician is listed as performing.
-            3. If this is a weekly schedule, extract EVERY SINGLE MUSIC EVENT listed and return them all as separate objects in the JSON array.
-            4. If the image is just a food menu, cocktail promo, or a meme with no music/DJ listed, set "is_event": false.
+            1. Extract events ONLY if they feature DJs, live music, acoustic bands, or nightlife.
+            2. If this flyer is a weekly overview containing multiple different dates, extract EVERY DATE as a separate object.
+            3. If this flyer is a poster for a single specific day, return just one object.
+            4. Ignore food promos without DJs. Set "is_event": false if no music/DJ is listed.
 
-            Return a valid JSON array of event objects. Even if there is only one event, return it inside an array.
+            Return a JSON array:
             [
               {
                 "is_event": true/false,
@@ -321,63 +311,80 @@ async function run() {
               contents: [{
                 parts: [
                   { text: prompt },
-                  {
-                    inlineData: {
-                      mimeType: "image/jpeg",
-                      data: buffer.toString("base64")
-                    }
-                  }
+                  { inlineData: { mimeType: "image/jpeg", data: buffer.toString("base64") } }
                 ]
               }]
             })
           });
 
           const aiData = await aiResponse.json();
-
           if (!aiData.candidates) continue;
 
-          let text = aiData.candidates[0].content.parts[0].text
-            .trim()
-            .replace(/```json|```/g, "");
-
+          let text = aiData.candidates[0].content.parts[0].text.trim().replace(/```json|```/g, "");
           const parsedJson = safeJSON(text);
           if (!parsedJson) continue;
 
           let results = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
-          
-          // Filters out anything Gemini labeled as is_event: false
           results = results.filter(r => r && r.is_event);
 
           if (results.length === 0) continue;
 
-          console.log(`✅ Found ${results.length} event(s) in flyer from ${username} [Priority: ${sourcePriority}]`);
+          // ⭐ MATHEMATICAL PRIORITY:
+          // If Gemini pulls 3 or more distinct dates from this ONE photo, it is 100% an Overview (Priority 2)
+          // If it only pulls 1 or 2 dates, it's highly specific/individual (Priority 10)
+          const uniqueDatesCount = new Set(results.map(r => r.event_date)).size;
+          const sourcePriority = uniqueDatesCount >= 3 ? 2 : 10;
+          
+          const posterType = sourcePriority === 10 ? "Dedicated Poster" : "Weekly Overview";
+          console.log(`   ➔ Found ${uniqueDatesCount} date(s) in Image ${i + 1} [Type: ${posterType} | Priority: ${sourcePriority}]`);
 
-          const hosted = await hostImage(buffer, username);
-
+          // Save the results to memory, overwriting overviews if a dedicated poster was found for that date
           for (const result of results) {
-            const djNameString = Array.isArray(result.djs) && result.djs.length > 0
-              ? result.djs.join(", ")
-              : (result.djs || "Headliner");
+            const eventDate = result.event_date || todayString;
 
-            const eventDate = result.event_date || new Date().toISOString().split("T")[0];
+            if (!bestEventsForThisPost[eventDate] || sourcePriority > bestEventsForThisPost[eventDate].sourcePriority) {
+              bestEventsForThisPost[eventDate] = {
+                ...result,
+                buffer, // Hold the image in memory temporarily so we don't upload the bad ones
+                sourcePriority,
+                eventDate
+              };
+            }
+          }
+          await new Promise(r => setTimeout(r, 1500));
+        }
 
-            const event = {
-              event_name: result.event_name || "Special Event",
+        // AFTER checking all images in the carousel, push ONLY the winners to Supabase
+        const finalDates = Object.keys(bestEventsForThisPost);
+        if (finalDates.length > 0) {
+          console.log(`🚀 Uploading ${finalDates.length} winning flyer(s) from this carousel...`);
+          
+          for (const date of finalDates) {
+            const winningEvent = bestEventsForThisPost[date];
+            
+            // Only now do we host the image (Saves Supabase Storage Space!)
+            const hostedUrl = await hostImage(winningEvent.buffer, username);
+
+            const djNameString = Array.isArray(winningEvent.djs) && winningEvent.djs.length > 0
+              ? winningEvent.djs.join(", ")
+              : (winningEvent.djs || "Headliner");
+
+            const dbPayload = {
+              event_name: winningEvent.event_name || "Special Event",
               dj_name: djNameString,
               club_name: username,
               city: "Makati",
-              event_date: eventDate,
-              image_url: hosted,
-              ig_post_url: `${post.url}#${eventDate}`, 
-              djs: Array.isArray(result.djs) ? result.djs : (result.djs ? [result.djs] : []),
-              source_priority: sourcePriority
+              event_date: winningEvent.eventDate,
+              image_url: hostedUrl,
+              ig_post_url: `${post.url}#${winningEvent.eventDate}`, 
+              djs: Array.isArray(winningEvent.djs) ? winningEvent.djs : (winningEvent.djs ? [winningEvent.djs] : []),
+              source_priority: winningEvent.sourcePriority
             };
 
-            await insertEvent(event);
+            await insertEvent(dbPayload);
           }
-
-          await new Promise(r => setTimeout(r, 1500));
         }
+
       } catch (err) {
         console.log("⚠️ Post failed:", err.message);
       }
