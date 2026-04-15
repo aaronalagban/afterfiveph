@@ -6,9 +6,32 @@ import { supabase } from "@/lib/supabase-client";
 import { 
   MapPin, ArrowUpRight, Calendar, Disc, Map as MapIcon, 
   X, Star, Zap, Instagram, ChevronLeft, ChevronRight,
-  Sun, Moon, Plus
+  Sun, Moon, Plus, Users 
 } from "lucide-react";
 import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+import Link from "next/link";
+
+// --- TYPES & INTERFACES ---
+export interface AfterFiveEvent {
+  id?: string | number;
+  event_date: string;
+  club_name: string;
+  event_name?: string;
+  djs?: string | string[];
+  dj_name?: string | string[];
+  dj_names: string[];
+  image_url?: string;
+  ig_post_url?: string;
+  [key: string]: any;
+}
+
+export interface MarkerData {
+  name: string;
+  lat: number;
+  lng: number;
+  type: string;
+  status: string;
+}
 
 // --- CONFIG & PALETTE (Soft Accents Theme) ---
 const THEME = {
@@ -46,7 +69,7 @@ const TAB_VARIANTS = {
 };
 
 const POBLACION_CENTER = { lat: 14.5648, lng: 121.0318 };
-const POBLACION_BARS = [
+const POBLACION_BARS: MarkerData[] = [
   { name: "Kampai", lat: 14.56420, lng: 121.03163, type: "Listening Bar", status: "03:00" },
   { name: "Apotheka Manila", lat: 14.56471, lng: 121.03234, type: "Club", status: "04:00" },
   { name: "Open House World", lat: 14.55869, lng: 121.02443, type: "Listening Bar", status: "02:00" },
@@ -85,7 +108,7 @@ const darkMapStyle = [
 ];
 
 export default function AfterFivePop() {
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<AfterFiveEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
   const [showBetaModal, setShowBetaModal] = useState(false);
@@ -121,7 +144,7 @@ export default function AfterFivePop() {
       if (error) console.error("Supabase Error:", error);
 
       if (data) {
-        const grouped = data.reduce((acc: any[], current: any) => {
+        const grouped = data.reduce<AfterFiveEvent[]>((acc, current) => {
           if (!current.event_date) return acc;
 
           let rawDjs = current.djs || current.dj_name || "";
@@ -139,7 +162,7 @@ export default function AfterFivePop() {
              }
           }
 
-          currentDjs = currentDjs.map((d: any) => String(d).replace(/[\[\]"]/g, '').trim()).filter((d) => d.length > 0);
+          currentDjs = currentDjs.map((d: string) => String(d).replace(/[\[\]"]/g, '').trim()).filter((d) => d.length > 0);
           if (currentDjs.length === 0) currentDjs = ["HEADLINER"];
 
           const existing = acc.find((e) => 
@@ -286,7 +309,7 @@ export default function AfterFivePop() {
               <h2 className="font-black text-3xl uppercase mb-4">WIP / BETA</h2>
               <p className={`font-mono text-sm mb-6 leading-relaxed ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>
                 AfterFive is currently in beta. If you have any suggestions or find bugs, feel free to slide into my DMs:
-                <a href="https://instagram.com/aaronalagbann" target="_blank" className="text-[#F53D04] font-bold block mt-2 hover:underline drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">@aaronalagbann</a>
+                <a href="https://instagram.com/aaronalagbann" target="_blank" rel="noreferrer" className="text-[#F53D04] font-bold block mt-2 hover:underline drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">@aaronalagbann</a>
                 <span className="block mt-4">Currently tracking venues:</span>
                 <span className={`block mt-3 ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>Kampai • Apotheka Manila • Open House World • Uma After Dark • Electric Sala • Ugly Duck</span>
                 <span className={`block mt-4 text-xs ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>Some events may not appear yet due to current automation limits.</span>
@@ -303,7 +326,7 @@ export default function AfterFivePop() {
       </AnimatePresence>
 
       {/* --- DESKTOP SIDEBAR --- */}
-      <nav className={`hidden md:flex flex-col w-[260px] h-full border-r z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+      <nav className={`hidden md:flex flex-col w-[300px] h-full border-r z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
         <div className={`h-[180px] border-b flex flex-col items-center justify-center p-6 text-center relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}>
            <div className={`absolute inset-0 opacity-10 ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
            <img src="/logo-1.png" alt="AfterFive Logo" className="w-48 z-10 relative cursor-pointer hover:scale-105 transition-transform" onClick={() => setView("LIVE")} />
@@ -314,6 +337,18 @@ export default function AfterFivePop() {
           <SidebarLink label="INCOMING" sub="THIS WEEK" active={view === "AGENDA"} onClick={() => setView("AGENDA")} color={darkMode ? "#5C548A" : "#7A7399"} icon={<Calendar />} darkMode={darkMode} />
           <SidebarLink label="MAP" sub="VENUES" active={view === "MAP"} onClick={() => setView("MAP")} color={darkMode ? "#3A6E8F" : "#5F8EA8"} icon={<MapIcon />} darkMode={darkMode} />
           <SidebarLink label="ARCHIVES" sub="WHAT YOU MISSED" active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} color={darkMode ? "#8F4A5A" : "#A06A75"} icon={<Disc />} darkMode={darkMode} />
+          
+          {/* FSD: COMMUNITIES (Highlighted) */}
+          <SidebarLink 
+            href="/communities" 
+            label="COMMUNITIES" 
+            sub="CULTURE & CREWS" 
+            active={false} 
+            color={darkMode ? "#10B981" : "#059669"} 
+            icon={<Users />} 
+            darkMode={darkMode} 
+            highlight={true} 
+          />
         </div>
 
         {/* Desktop Footer Toggles */}
@@ -370,6 +405,10 @@ export default function AfterFivePop() {
          <MobileNavBtn icon={<MapIcon size={18} />} active={view === "MAP"} onClick={() => setView("MAP")} color={darkMode ? "#3A6E8F" : "#5F8EA8"} darkMode={darkMode} />
          <div className={`w-[1px] h-full ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
          <MobileNavBtn icon={<Disc size={18} />} active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} color={darkMode ? "#8F4A5A" : "#A06A75"} darkMode={darkMode} />
+         <div className={`w-[1px] h-full ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
+         
+         {/* FSD: COMMUNITIES MOBILE LINK (Highlighted) */}
+         <MobileNavBtn href="/communities" icon={<Users size={18} />} active={false} color={darkMode ? "#10B981" : "#059669"} darkMode={darkMode} highlight={true} />
       </div>
 
     </div>
@@ -379,7 +418,12 @@ export default function AfterFivePop() {
 // ==========================================
 // 1. GALLERY VIEW (LIVE/CURRENT)
 // ==========================================
-function GalleryView({ events, darkMode }: { events: any[], darkMode: boolean }) {
+interface ViewProps {
+  events: AfterFiveEvent[];
+  darkMode: boolean;
+}
+
+function GalleryView({ events, darkMode }: ViewProps) {
   const [current, setCurrent] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -428,7 +472,6 @@ function GalleryView({ events, darkMode }: { events: any[], darkMode: boolean })
        </div>
 
        <div className={`h-auto shrink-0 border-t flex flex-row md:items-stretch z-20 relative ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
-          {/* Using w-1/4 on mobile to align perfectly with the first nav divider */}
           <div className={`w-1/4 md:w-[200px] shrink-0 border-r p-2 md:p-4 flex flex-col justify-center items-center text-center ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#F53D04]' : 'bg-[#FFE5DE] border-[#E5E5EA] text-[#F53D04]'}`}>
              <span className="font-mono font-bold text-[8px] md:text-sm uppercase tracking-widest mb-1 text-inherit hidden md:block">Happening</span>
              <span className="font-black text-3xl md:text-6xl uppercase leading-none text-inherit">{new Date(activeEvent.event_date).getDate()}</span>
@@ -443,12 +486,10 @@ function GalleryView({ events, darkMode }: { events: any[], darkMode: boolean })
              <div className={`p-3 md:p-6 overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4 ${darkMode ? 'bg-[#151518]' : 'bg-[#F7F7F9]'}`}>
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-col justify-center overflow-hidden">
-                    {/* HIERARCHY: 1. VENUE */}
                     <h3 className="font-black text-lg md:text-3xl uppercase text-[#F53D04] mb-1 line-clamp-1 drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">
                       {activeEvent.club_name}
                     </h3>
                     
-                    {/* HIERARCHY: 2. EVENT NAME */}
                     {title.length > 25 ? (
                       <div className="whitespace-nowrap overflow-hidden py-1">
                          <h2 className={`animate-marquee-title font-black text-3xl md:text-5xl uppercase ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
@@ -462,9 +503,8 @@ function GalleryView({ events, darkMode }: { events: any[], darkMode: boolean })
                     )}
                   </div>
 
-                  {/* HIERARCHY: 3. DJ LINE UP */}
                   <div className="flex flex-wrap gap-1.5 md:gap-2 mt-2">
-                    {(activeEvent.dj_names || []).map((dj: string, i: number) => (
+                    {(activeEvent.dj_names || []).map((dj, i) => (
                         <span key={i} className={`px-2.5 py-1 md:px-3 md:py-1.5 font-mono font-bold text-[10px] md:text-sm uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#FFFFFF] text-[#55555A] border-[#E5E5EA]'}`}>
                           {dj}
                         </span>
@@ -472,7 +512,7 @@ function GalleryView({ events, darkMode }: { events: any[], darkMode: boolean })
                   </div>
                 </div>
 
-                <a href={activeEvent.ig_post_url} target="_blank" className={`px-5 py-3 md:px-8 md:py-4 font-black uppercase tracking-widest text-[10px] md:text-xs transition-colors shadow-[0_0_15px_rgba(245,61,4,0.4)] flex items-center justify-center gap-2 shrink-0 ${darkMode ? 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#FF4D1A] hover:shadow-[0_0_25px_rgba(245,61,4,0.6)]' : 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#D93600]'}`}>
+                <a href={activeEvent.ig_post_url} target="_blank" rel="noreferrer" className={`px-5 py-3 md:px-8 md:py-4 font-black uppercase tracking-widest text-[10px] md:text-xs transition-colors shadow-[0_0_15px_rgba(245,61,4,0.4)] flex items-center justify-center gap-2 shrink-0 ${darkMode ? 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#FF4D1A] hover:shadow-[0_0_25px_rgba(245,61,4,0.6)]' : 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#D93600]'}`}>
                    <Instagram size={18} /> <span className="hidden md:inline">VIEW</span> INSTAGRAM
                 </a>
              </div>
@@ -485,8 +525,12 @@ function GalleryView({ events, darkMode }: { events: any[], darkMode: boolean })
 // ==========================================
 // 2. BLOCK LIST VIEW (AGENDA/INCOMING)
 // ==========================================
-function BlockListView({ title, events, darkMode }: { title: string, events: any[], darkMode: boolean }) {
-  const grouped = events.reduce((acc: any, event: any) => {
+interface BlockListViewProps extends ViewProps {
+  title: string;
+}
+
+function BlockListView({ title, events, darkMode }: BlockListViewProps) {
+  const grouped = events.reduce<Record<string, AfterFiveEvent[]>>((acc, event) => {
     if (!event.event_date) return acc;
     const dateStr = String(event.event_date).substring(0, 10);
     if (!acc[dateStr]) acc[dateStr] = [];
@@ -502,7 +546,6 @@ function BlockListView({ title, events, darkMode }: { title: string, events: any
     >
        <div className={`fixed inset-0 pointer-events-none z-0 ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
        
-       {/* Main sticky header - h: 69px (mobile) / 137px (desktop) */}
        <div className={`sticky top-0 z-50 border-b p-4 md:p-8 backdrop-blur-md ${darkMode ? 'bg-[#0B0B0D]/95 border-[#2A2A2E]' : 'bg-[#FFFFFF]/95 border-[#E5E5EA]'}`}>
           <h1 className={`font-black text-4xl md:text-7xl uppercase tracking-tighter leading-none ${darkMode ? 'text-[#FFFFFF] drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]' : 'text-[#111111] drop-shadow-[0_0_15px_rgba(0,0,0,0.05)]'}`}>{title}</h1>
        </div>
@@ -515,7 +558,6 @@ function BlockListView({ title, events, darkMode }: { title: string, events: any
                return (
                  <div key={date} className={`relative ${isWeekend ? 'ring-2 ring-[#F53D04] shadow-[0_0_30px_rgba(245,61,4,0.1)] z-20' : ''}`}>
                     <div 
-                      // Fixed Top Offsets to close the gap perfectly below the main header
                       className={`sticky top-[69px] md:top-[137px] z-40 py-3 px-3 md:px-6 flex justify-between items-center transition-all ${
                         isWeekend 
                           ? (darkMode ? 'bg-[#1C1C20] border-b-2 border-[#F53D04]' : 'bg-[#FFE5DE] border-b-2 border-[#F53D04]') 
@@ -541,8 +583,8 @@ function BlockListView({ title, events, darkMode }: { title: string, events: any
                     </div>
                     
                     <div className={`grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-0 border-b ${darkMode ? 'border-[#2A2A2E]' : 'border-[#E5E5EA]'}`}>
-                       {grouped[date].map((e: any, i: number) => (
-                          <a key={i} href={e.ig_post_url} target="_blank" className={`group relative border-r flex flex-col h-full overflow-hidden hover:z-20 ${darkMode ? 'border-[#2A2A2E] bg-[#1C1C20]' : 'border-[#E5E5EA] bg-[#FFFFFF]'}`}>
+                       {grouped[date].map((e, i) => (
+                          <a key={i} href={e.ig_post_url} target="_blank" rel="noreferrer" className={`group relative border-r flex flex-col h-full overflow-hidden hover:z-20 ${darkMode ? 'border-[#2A2A2E] bg-[#1C1C20]' : 'border-[#E5E5EA] bg-[#FFFFFF]'}`}>
                              <div className={`w-full aspect-square border-b flex items-center justify-center overflow-hidden ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
                                 {e.image_url ? (
                                   <img src={e.image_url} className="w-full h-full object-contain group-hover:scale-105 transition-all duration-300" />
@@ -555,17 +597,14 @@ function BlockListView({ title, events, darkMode }: { title: string, events: any
                                   {darkMode && <div className="absolute inset-0 bg-[#2A2A2E] opacity-0 group-hover:opacity-20 transition-opacity duration-200 pointer-events-none z-0" />}
                                   
                                   <div className="relative z-10 flex flex-col h-full">
-                                    {/* HIERARCHY: 1. VENUE */}
                                     <span className="font-black text-[10px] md:text-sm text-[#F53D04] uppercase mb-1 line-clamp-1">{e.club_name}</span>
                                     
-                                    {/* HIERARCHY: 2. EVENT NAME */}
                                     <h3 className={`font-black text-sm md:text-xl uppercase leading-[1.1] mb-3 line-clamp-2 break-words transition-colors ${darkMode ? 'text-[#B3B3B8] group-hover:text-[#FFFFFF]' : 'text-[#55555A] group-hover:text-[#111111]'}`}>
                                       {e.event_name || "CLUB NIGHT"}
                                     </h3>
                                     
-                                    {/* HIERARCHY: 3. DJ LINE UP */}
                                     <div className="flex flex-wrap gap-1.5 mt-auto">
-                                       {(e.dj_names || []).map((dj: string, idx: number) => (
+                                       {(e.dj_names || []).map((dj, idx) => (
                                          <span key={idx} className={`px-2 py-[2px] font-mono font-bold text-[10px] md:text-xs uppercase border transition-all ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E] group-hover:border-[#FFFFFF] group-hover:text-[#FFFFFF]' : 'bg-[#F2F2F5] text-[#55555A] border-[#E5E5EA] group-hover:border-[#111111] group-hover:text-[#111111]'}`}>
                                            {dj}
                                          </span>
@@ -587,8 +626,8 @@ function BlockListView({ title, events, darkMode }: { title: string, events: any
 // ==========================================
 // 3. ARCHIVE CALENDAR VIEW (INSTA-STYLE)
 // ==========================================
-function ArchiveCalendarView({ events, darkMode }: { events: any[], darkMode: boolean }) {
-  const grouped = events.reduce((acc: any, event: any) => {
+function ArchiveCalendarView({ events, darkMode }: ViewProps) {
+  const grouped = events.reduce<Record<string, AfterFiveEvent[]>>((acc, event) => {
     if (!event.event_date) return acc;
     const dateObj = new Date(event.event_date);
     const monthYear = dateObj.toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -611,8 +650,8 @@ function ArchiveCalendarView({ events, darkMode }: { events: any[], darkMode: bo
           <div key={monthYear}>
             <h2 className={`font-black text-2xl uppercase mb-4 pl-2 border-l-4 border-[#F53D04] tracking-widest ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>{monthYear}</h2>
             <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1 md:gap-2">
-              {(monthEvents as any[]).map((e: any, i: number) => (
-                <a key={i} href={e.ig_post_url} target="_blank" className={`group relative aspect-square overflow-hidden block border ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+              {monthEvents.map((e, i) => (
+                <a key={i} href={e.ig_post_url} target="_blank" rel="noreferrer" className={`group relative aspect-square overflow-hidden block border ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
                   {e.image_url ? (
                     <img src={e.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
@@ -627,7 +666,7 @@ function ArchiveCalendarView({ events, darkMode }: { events: any[], darkMode: bo
                     <span className="text-[#F53D04] font-black text-[9px] md:text-[11px] uppercase mb-1 line-clamp-1">{e.club_name}</span>
                     <span className="text-[#FFFFFF] font-bold text-xs md:text-sm leading-tight line-clamp-2 mb-2">{e.event_name}</span>
                     <div className="hidden md:flex flex-wrap justify-center gap-1">
-                      {(e.dj_names || []).slice(0, 3).map((dj: string, idx: number) => (
+                      {(e.dj_names || []).slice(0, 3).map((dj, idx) => (
                         <span key={idx} className="text-[#B3B3B8] font-mono text-[9px] uppercase">{dj}</span>
                       ))}
                     </div>
@@ -645,9 +684,15 @@ function ArchiveCalendarView({ events, darkMode }: { events: any[], darkMode: bo
 // ==========================================
 // 4. MAP VIEW
 // ==========================================
-function MapView({ isLoaded, darkMode }: { isLoaded: boolean, darkMode: boolean }) {
-  const [selected, setSelected] = useState<any>(null);
-return (
+interface MapViewProps {
+  isLoaded: boolean;
+  darkMode: boolean;
+}
+
+function MapView({ isLoaded, darkMode }: MapViewProps) {
+  const [selected, setSelected] = useState<MarkerData | null>(null);
+  
+  return (
     <motion.div 
       variants={TAB_VARIANTS} initial="initial" animate="animate" exit="exit"
       className="w-full h-full relative"
@@ -655,7 +700,7 @@ return (
        {!isLoaded ? <div className={`w-full h-full flex items-center justify-center font-black ${darkMode ? 'text-[#FFFFFF] bg-[#0B0B0D]' : 'text-[#111111] bg-[#FFFFFF]'}`}>LOADING...</div> : (
          <GoogleMap mapContainerClassName="w-full h-full" center={POBLACION_CENTER} zoom={17} options={{ styles: darkMode ? darkMapStyle : popMapStyle, disableDefaultUI: true, clickableIcons: false }} onClick={() => setSelected(null)}>
             {POBLACION_BARS.map((bar, i) => (
-               <Marker key={i} position={bar} icon={{ path: typeof window !== "undefined" ? window.google.maps.SymbolPath.CIRCLE : 0, fillColor: selected?.name === bar.name ? "#F53D04" : (darkMode ? "#FFFFFF" : "#111111"), fillOpacity: 1, scale: 12, strokeColor: darkMode ? "#1C1C20" : "#FFFFFF", strokeWeight: 3 }} onClick={() => setSelected(bar)} />
+               <Marker key={i} position={{ lat: bar.lat, lng: bar.lng }} icon={{ path: typeof window !== "undefined" && window.google ? window.google.maps.SymbolPath.CIRCLE : 0, fillColor: selected?.name === bar.name ? "#F53D04" : (darkMode ? "#FFFFFF" : "#111111"), fillOpacity: 1, scale: 12, strokeColor: darkMode ? "#1C1C20" : "#FFFFFF", strokeWeight: 3 }} onClick={() => setSelected(bar)} />
             ))}
          </GoogleMap>
        )}
@@ -663,7 +708,7 @@ return (
             <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className={`absolute bottom-16 md:bottom-8 left-4 md:left-8 right-4 md:w-[400px] border p-6 z-30 shadow-[0_0_20px_rgba(0,0,0,0.1)] ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]'}`}>
                <div className="flex justify-between items-start mb-2"><h3 className="font-black text-2xl uppercase">{selected.name}</h3><button onClick={() => setSelected(null)}><X size={24} className={`border hover:bg-[#F53D04] hover:border-[#F53D04] hover:text-[#FFFFFF] transition-colors ${darkMode ? 'border-[#6E6E73]' : 'border-[#8C8C92]'}`} /></button></div>
                <div className="flex gap-2 mb-4"><div className={`px-2 py-1 font-mono text-xs font-bold border uppercase ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#F2F2F5] text-[#55555A] border-[#E5E5EA]'}`}>{selected.type}</div><div className={`px-2 py-1 font-mono text-xs font-bold border uppercase ${darkMode ? 'bg-[#151518] text-[#F53D04] border-[#2A2A2E]' : 'bg-[#FFE5DE] text-[#F53D04] border-[#FFE5DE]'}`}>UNTIL {selected.status}</div></div>
-               <a href={`https://www.google.com/maps/search/?api=1&query=${selected.lat},${selected.lng}`} target="_blank" className={`block w-full text-center py-3 font-bold uppercase transition-all border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#F53D04] hover:border-[#F53D04] hover:shadow-[0_0_15px_rgba(245,61,4,0.4)]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#F53D04] hover:text-[#FFFFFF] hover:border-[#F53D04] hover:shadow-[0_0_15px_rgba(245,61,4,0.3)]'}`}>NAVIGATE</a>
+               <a href={`https://www.google.com/maps/search/?api=1&query=${selected.lat},${selected.lng}`} target="_blank" rel="noreferrer" className={`block w-full text-center py-3 font-bold uppercase transition-all border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#F53D04] hover:border-[#F53D04] hover:shadow-[0_0_15px_rgba(245,61,4,0.4)]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#F53D04] hover:text-[#FFFFFF] hover:border-[#F53D04] hover:shadow-[0_0_15px_rgba(245,61,4,0.3)]'}`}>NAVIGATE</a>
             </motion.div>
        )}</AnimatePresence>
     </motion.div>
@@ -674,26 +719,90 @@ return (
 // UTILITIES
 // ==========================================
 
-function SidebarLink({ label, sub, active, onClick, color, icon, darkMode }: any) {
-  const baseBg = darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#1C1C20]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#FFFFFF]';
+interface SidebarLinkProps {
+  label: string;
+  sub: string;
+  active: boolean;
+  onClick?: () => void;
+  href?: string;
+  color: string;
+  icon: React.ReactNode;
+  darkMode: boolean;
+  highlight?: boolean; // FSD Emphasis prop
+}
+
+function SidebarLink({ label, sub, active, onClick, href, color, icon, darkMode, highlight = false }: SidebarLinkProps) {
+  
+  // Highlighting specific background color modification, keeping structural integrity uniform
+  const baseBg = highlight 
+    ? (darkMode ? 'bg-[#10B981]/10 text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#10B981]/20' : 'bg-[#10B981]/10 text-[#111111] border-[#E5E5EA] hover:bg-[#10B981]/20')
+    : (darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#1C1C20]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#FFFFFF]');
+  
   const activeBg = darkMode ? 'bg-[#1C1C20] text-[#FFFFFF] border-[#2A2A2E]' : 'bg-[#FFFFFF] text-[#111111] border-[#E5E5EA]';
+  
+  const content = (
+    <>
+      <div className={`absolute left-0 top-0 bottom-0 w-1 transition-all ${active ? 'w-full opacity-5' : 'w-1'}`} style={{ backgroundColor: color }} />
+      <div className="relative z-10 pl-4">
+        <h3 className={`font-black text-lg uppercase mb-1 ${active ? `drop-shadow-[0_0_8px_${color}40]` : ''}`}>{label}</h3>
+        <p className={`font-mono text-[10px] font-bold tracking-widest uppercase ${highlight ? 'opacity-80 text-[#10B981]' : 'opacity-60'}`}>{sub}</p>
+      </div>
+      <div className={`relative z-10 transition-all ${active || highlight ? `scale-110 drop-shadow-[0_0_10px_${color}]` : ''}`} style={{ color: active || highlight ? color : (darkMode ? '#B3B3B8' : '#55555A') }}>
+        {icon}
+      </div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={`block w-full p-6 text-left border-b transition-all group relative overflow-hidden flex items-center justify-between ${active ? activeBg : baseBg}`}>
+        {content}
+      </Link>
+    );
+  }
+
   return (
     <button onClick={onClick} className={`w-full p-6 text-left border-b transition-all group relative overflow-hidden flex items-center justify-between ${active ? activeBg : baseBg}`}>
-      <div className={`absolute left-0 top-0 bottom-0 w-1 transition-all ${active ? 'w-full opacity-5' : 'w-1'}`} style={{ backgroundColor: color }} />
-      <div className="relative z-10 pl-4"><h3 className={`font-black text-2xl uppercase mb-1 ${active ? `drop-shadow-[0_0_8px_${color}40]` : ''}`}>{label}</h3><p className="font-mono text-[10px] font-bold tracking-widest uppercase opacity-60">{sub}</p></div>
-      <div className={`relative z-10 transition-all ${active ? `scale-110 drop-shadow-[0_0_10px_${color}]` : ''}`} style={{ color: active ? color : (darkMode ? '#B3B3B8' : '#55555A') }}>{icon}</div>
+      {content}
     </button>
   );
 }
 
-function MobileNavBtn({ icon, active, onClick, color, darkMode }: any) {
+interface MobileNavBtnProps {
+  icon: React.ReactNode;
+  active: boolean;
+  onClick?: () => void;
+  href?: string;
+  color: string;
+  darkMode: boolean;
+  highlight?: boolean; // FSD Emphasis prop
+}
+
+function MobileNavBtn({ icon, active, onClick, href, color, darkMode, highlight = false }: MobileNavBtnProps) {
   const activeBg = darkMode ? 'bg-[#1C1C20] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#111111]';
-  const baseBg = darkMode ? 'bg-[#151518] text-[#6E6E73]' : 'bg-[#F7F7F9] text-[#8C8C92]';
+  
+  // Highlighting in mobile applies a distinct background block
+  const baseBg = highlight 
+    ? (darkMode ? 'bg-[#10B981]/20 text-[#10B981]' : 'bg-[#10B981]/15 text-[#059669]')
+    : (darkMode ? 'bg-[#151518] text-[#6E6E73]' : 'bg-[#F7F7F9] text-[#8C8C92]');
+  
+  const content = (
+    <div className={`${active || highlight ? 'scale-125' : 'scale-100'} transition-all flex items-center justify-center w-full h-full`} style={{ color: active || highlight ? color : 'inherit', filter: active || highlight ? `drop-shadow(0 0 8px ${color})` : 'none' }}>
+      {icon}
+    </div>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={`flex-1 flex items-center justify-center transition-all ${active ? activeBg : baseBg}`}>
+        {content}
+      </Link>
+    );
+  }
+
   return (
     <button onClick={onClick} className={`flex-1 flex items-center justify-center transition-all ${active ? activeBg : baseBg}`}>
-      <div className={`${active ? 'scale-125' : 'scale-100'} transition-all`} style={{ color: active ? color : 'inherit', filter: active ? `drop-shadow(0 0 8px ${color})` : 'none' }}>
-        {icon}
-      </div>
+      {content}
     </button>
   );
 }

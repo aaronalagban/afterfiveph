@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "src/app/communities/[id]/page.jsx"  ],
   "exclude": ["node_modules"]
 }
