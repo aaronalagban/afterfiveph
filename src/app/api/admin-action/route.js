@@ -25,7 +25,7 @@ export async function POST(request) {
       return NextResponse.json({ queue: data });
     }
 
-    // APPROVE (Runs Scraper)
+    // APPROVE
     if (action === 'approve') {
       await approveAndScrapeEvent(eventId);
       return NextResponse.json({ success: true });

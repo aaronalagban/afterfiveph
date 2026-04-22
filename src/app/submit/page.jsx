@@ -1,5 +1,5 @@
 // src/app/admin/submit/page.jsx
-import ManualSubmissionForm from '../../components/ManualSubmissionForm'; // Adjust path as needed
+import ManualSubmissionForm from '../../components/ManualSubmissionForm';
 
 export const metadata = {
   title: 'AfterFive Admin | Submit Event',

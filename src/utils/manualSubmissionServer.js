@@ -35,7 +35,7 @@ export async function approveAndScrapeEvent(pendingEventId) {
 
   console.log(`🔍 Scraping IG Post: ${pendingEvent.ig_post_url}`);
 
-  // 2. Direct REST API Call to Apify (Bypasses the buggy apify-client package)
+  // 2. Direct REST API Call to Apify 
   const apifyRes = await fetch(
     `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${apifyToken}`,
     {
@@ -86,7 +86,7 @@ export async function approveAndScrapeEvent(pendingEventId) {
     image_url: finalImageUrl,
     ig_post_url: pendingEvent.ig_post_url,
     djs: pendingEvent.djs,
-    source_priority: 100 // Top priority since a human approved it
+    source_priority: 100
   });
 
   if (insertError) throw new Error(`Live DB Insert Error: ${insertError.message}`);

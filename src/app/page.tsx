@@ -11,7 +11,7 @@ import {
 import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
 import Link from "next/link";
 
-// --- TYPES & INTERFACES ---
+// --- Types ---
 export interface AfterFiveEvent {
   id?: string | number;
   event_date: string;
@@ -33,7 +33,7 @@ export interface MarkerData {
   status: string;
 }
 
-// --- CONFIG & PALETTE (Soft Accents Theme) ---
+// --- Config & Theme ---
 const THEME = {
   dark: {
     bgPrimary: "#0B0B0D",
@@ -60,7 +60,7 @@ const THEME = {
   }
 };
 
-// Animation Variants for Tab Switching
+// Tab transition variants
 const TAB_VARIANTS = {
   initial: { opacity: 0, y: 10 },
   animate: { opacity: 1, y: 0 },
@@ -118,7 +118,6 @@ export default function AfterFivePop() {
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded: isMapLoaded } = useLoadScript({ googleMapsApiKey: googleMapsKey || "" });
 
-  // Initialize Theme
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') setDarkMode(true);
@@ -274,7 +273,7 @@ export default function AfterFivePop() {
         }
       `}} />
 
-      {/* --- SPLASH SCREEN --- */}
+      {/* --- Splash Screen --- */}
       <AnimatePresence>
         {showSplash && (
           <motion.div 
@@ -296,7 +295,7 @@ export default function AfterFivePop() {
         )}
       </AnimatePresence>
       
-      {/* --- BETA MODAL --- */}
+      {/* --- Beta Modal --- */}
       <AnimatePresence>
   {showBetaModal && (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -315,7 +314,6 @@ export default function AfterFivePop() {
         </p>
 
         <div className="flex flex-col gap-3">
-          {/* New Submit Button/Link */}
           <a 
             href="https://afterfiveph.vercel.app/submit"
             target="_blank"
@@ -325,7 +323,6 @@ export default function AfterFivePop() {
             Submit an Event
           </a>
 
-          {/* Original Aight Button */}
           <button 
             onClick={() => setShowBetaModal(false)}
             className={`w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#F53D04] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.4)]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#F53D04] hover:text-[#FFFFFF] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.3)]'}`}
@@ -338,7 +335,7 @@ export default function AfterFivePop() {
   )}
 </AnimatePresence>
 
-      {/* --- DESKTOP SIDEBAR --- */}
+      {/* --- Desktop Sidebar --- */}
       <nav className={`hidden md:flex flex-col w-[300px] h-full border-r z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
         <div className={`h-[180px] border-b flex flex-col items-center justify-center p-6 text-center relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}>
            <div className={`absolute inset-0 opacity-10 ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
@@ -351,7 +348,7 @@ export default function AfterFivePop() {
           <SidebarLink label="MAP" sub="VENUES" active={view === "MAP"} onClick={() => setView("MAP")} color={darkMode ? "#3A6E8F" : "#5F8EA8"} icon={<MapIcon />} darkMode={darkMode} />
           <SidebarLink label="ARCHIVES" sub="WHAT YOU MISSED" active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} color={darkMode ? "#8F4A5A" : "#A06A75"} icon={<Disc />} darkMode={darkMode} />
           
-          {/* FSD: COMMUNITIES (Highlighted) */}
+          {/* make sure communities tab pops out */}
           <SidebarLink 
             href="/communities" 
             label="COMMUNITIES" 
@@ -364,7 +361,6 @@ export default function AfterFivePop() {
           />
         </div>
 
-        {/* Desktop Footer Toggles */}
         <div className={`p-4 flex justify-between items-center border-t font-mono text-[10px] uppercase tracking-wider ${darkMode ? 'bg-[#151518] border-[#2A2A2E] text-[#B3B3B8]' : 'bg-[#F7F7F9] border-[#E5E5EA] text-[#55555A]'}`}>
           <a href="/submit" className={`hover:text-[#F53D04] transition-all flex items-center gap-1 group ${darkMode ? 'hover:drop-shadow-[0_0_8px_rgba(245,61,4,0.6)]' : ''}`}>
             <Plus size={12} className="group-hover:rotate-90 transition-transform" /> Submit Event
@@ -379,7 +375,6 @@ export default function AfterFivePop() {
         </div>
       </nav>
 
-      {/* --- MAIN CONTENT --- */}
       <main className="flex-1 w-full h-full relative overflow-hidden flex flex-col">
         {/* Mobile Header */}
         <div className={`md:hidden h-[60px] w-full border-b flex items-center justify-between px-4 z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
@@ -409,7 +404,7 @@ export default function AfterFivePop() {
         </div>
       </main>
 
-      {/* --- MOBILE NAV --- */}
+      {/* --- Mobile Nav --- */}
       <div className={`md:hidden fixed bottom-0 left-0 w-full h-12 border-t z-50 flex items-stretch ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
          <MobileNavBtn icon={<Zap size={18} />} active={view === "LIVE"} onClick={() => setView("LIVE")} color="#F53D04" darkMode={darkMode} />
          <div className={`w-[1px] h-full ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
@@ -420,7 +415,7 @@ export default function AfterFivePop() {
          <MobileNavBtn icon={<Disc size={18} />} active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} color={darkMode ? "#8F4A5A" : "#A06A75"} darkMode={darkMode} />
          <div className={`w-[1px] h-full ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
          
-         {/* FSD: COMMUNITIES MOBILE LINK (Highlighted) */}
+         {/* communities tab (mobile) */}
          <MobileNavBtn href="/communities" icon={<Users size={18} />} active={false} color={darkMode ? "#10B981" : "#059669"} darkMode={darkMode} highlight={true} />
       </div>
 
@@ -428,9 +423,8 @@ export default function AfterFivePop() {
   );
 }
 
-// ==========================================
-// 1. GALLERY VIEW (LIVE/CURRENT)
-// ==========================================
+// --- 1. Gallery View (Live) ---
+
 interface ViewProps {
   events: AfterFiveEvent[];
   darkMode: boolean;
@@ -535,9 +529,8 @@ function GalleryView({ events, darkMode }: ViewProps) {
   );
 }
 
-// ==========================================
-// 2. BLOCK LIST VIEW (AGENDA/INCOMING)
-// ==========================================
+// --- 2. Block List View (Agenda) ---
+
 interface BlockListViewProps extends ViewProps {
   title: string;
 }
@@ -636,9 +629,8 @@ function BlockListView({ title, events, darkMode }: BlockListViewProps) {
   );
 }
 
-// ==========================================
-// 3. ARCHIVE CALENDAR VIEW (INSTA-STYLE)
-// ==========================================
+// --- 3. Archive View ---
+
 function ArchiveCalendarView({ events, darkMode }: ViewProps) {
   const grouped = events.reduce<Record<string, AfterFiveEvent[]>>((acc, event) => {
     if (!event.event_date) return acc;
@@ -694,9 +686,8 @@ function ArchiveCalendarView({ events, darkMode }: ViewProps) {
   );
 }
 
-// ==========================================
-// 4. MAP VIEW
-// ==========================================
+// --- 4. Map View ---
+
 interface MapViewProps {
   isLoaded: boolean;
   darkMode: boolean;
@@ -728,9 +719,7 @@ function MapView({ isLoaded, darkMode }: MapViewProps) {
   );
 }
 
-// ==========================================
-// UTILITIES
-// ==========================================
+// --- Utilities ---
 
 interface SidebarLinkProps {
   label: string;
@@ -741,12 +730,12 @@ interface SidebarLinkProps {
   color: string;
   icon: React.ReactNode;
   darkMode: boolean;
-  highlight?: boolean; // FSD Emphasis prop
+  highlight?: boolean;
 }
 
 function SidebarLink({ label, sub, active, onClick, href, color, icon, darkMode, highlight = false }: SidebarLinkProps) {
   
-  // Highlighting specific background color modification, keeping structural integrity uniform
+  // tweak bg if it's a highlighted link
   const baseBg = highlight 
     ? (darkMode ? 'bg-[#10B981]/10 text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#10B981]/20' : 'bg-[#10B981]/10 text-[#111111] border-[#E5E5EA] hover:bg-[#10B981]/20')
     : (darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#1C1C20]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#FFFFFF]');
@@ -788,13 +777,13 @@ interface MobileNavBtnProps {
   href?: string;
   color: string;
   darkMode: boolean;
-  highlight?: boolean; // FSD Emphasis prop
+  highlight?: boolean;
 }
 
 function MobileNavBtn({ icon, active, onClick, href, color, darkMode, highlight = false }: MobileNavBtnProps) {
   const activeBg = darkMode ? 'bg-[#1C1C20] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#111111]';
   
-  // Highlighting in mobile applies a distinct background block
+  // different styling for highlighted tabs on mobile
   const baseBg = highlight 
     ? (darkMode ? 'bg-[#10B981]/20 text-[#10B981]' : 'bg-[#10B981]/15 text-[#059669]')
     : (darkMode ? 'bg-[#151518] text-[#6E6E73]' : 'bg-[#F7F7F9] text-[#8C8C92]');

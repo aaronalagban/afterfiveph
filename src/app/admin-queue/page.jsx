@@ -96,7 +96,7 @@ export default function AdminQueue() {
           </div>
         ) : (
           <AnimatePresence>
-            {/* Show only the top card to mimic Bumble/Tinder */}
+            {}
             <motion.div 
               key={queue[0].id}
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
