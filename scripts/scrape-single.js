@@ -5,8 +5,17 @@ import Tesseract from "tesseract.js";
 
 dotenv.config({ path: ".env.local" });
 
+// Get the club handle from the command line arguments
+const TARGET_CLUB = process.argv[2];
+
+if (!TARGET_CLUB) {
+  console.error("❌ ERROR: Please provide an Instagram handle.");
+  console.error("👉 Example: node scrape-single.js uglyduckpoblacion");
+  process.exit(1);
+}
+
 /* ---------------------------
-SUPABASE
+SUPABASE, APIFY, GEMINI
 --------------------------- */
 
 const supabase = createClient(
@@ -14,33 +23,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-/* ---------------------------
-APIFY
---------------------------- */
-
 const apifyClient = new ApifyClient({
   token: process.env.APIFY_API_TOKEN
 });
 
-/* ---------------------------
-GEMINI
---------------------------- */
-
 const GEMINI_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
-
-/* ---------------------------
-TARGET CLUBS
---------------------------- */
-
-const TARGET_ACCOUNTS = [
-  "annexhousemanila",
-  "kampaiph",
-  "apothekamanila",
-  "openhouse.world",
-  "umaafterdark",
-  "uglyduckpoblacion"
-];
 
 /* ---------------------------
 UPLOAD IMAGE
@@ -51,41 +39,40 @@ async function hostImage(buffer, username) {
 
   const { error } = await supabase.storage
     .from("event-flyers")
-    .upload(fileName, buffer, {
-      contentType: "image/jpeg",
-      upsert: true
-    });
+    .upload(fileName, buffer, { contentType: "image/jpeg", upsert: true });
 
   if (error) throw new Error(error.message);
 
-  const { data: { publicUrl } } =
-    supabase.storage.from("event-flyers").getPublicUrl(fileName);
-
+  const { data: { publicUrl } } = supabase.storage.from("event-flyers").getPublicUrl(fileName);
   return publicUrl;
 }
 
 /* ---------------------------
-DATE FILTER
+2-WEEK DATE FILTER
 --------------------------- */
 
-function isFromThisWeek(dateString) {
-  const postDate = new Date(dateString);
+function isFromLastTwoWeeks(dateValue) {
+  if (!dateValue) return true;
+
+  let postDate = new Date(dateValue);
+
+  // Handle Unix timestamps
+  if (typeof dateValue === 'number' && dateValue < 10000000000) {
+    postDate = new Date(dateValue * 1000);
+  }
+
+  if (isNaN(postDate.getTime())) return true;
+
+  // Look back exactly 14 days
   const today = new Date();
-  
-  // getDay() returns 0 for Sunday, 1 for Monday, etc.
-  const dayOfWeek = today.getDay(); 
+  const cutoffDate = new Date(today.getTime() - (14 * 24 * 60 * 60 * 1000));
+  cutoffDate.setHours(0, 0, 0, 0);
 
-  // Subtracting the current dayOfWeek exactly lands on the most recent Sunday.
-  // (If today is Wednesday(3), it subtracts 3 days. If today is Sunday(0), it subtracts 0 days).
-  const diffToSunday = today.getDate() - dayOfWeek;
-  const lastSunday = new Date(today.setDate(diffToSunday));
-  lastSunday.setHours(0, 0, 0, 0);
-
-  return postDate >= lastSunday;
+  return postDate >= cutoffDate;
 }
 
 /* ---------------------------
-CAPTION SCORING
+HELPERS & AI
 --------------------------- */
 
 function captionScore(caption) {
@@ -107,10 +94,6 @@ function captionScore(caption) {
   return score;
 }
 
-/* ---------------------------
-OCR & AI HELPERS
---------------------------- */
-
 async function extractText(buffer) {
   try {
     const { data: { text } } = await Tesseract.recognize(buffer, "eng", { logger: () => { } });
@@ -130,16 +113,8 @@ function looksLikePoster(text) {
 }
 
 function safeJSON(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(text); } catch { return null; }
 }
-
-/* ---------------------------
-LOAD KNOWN DJs
---------------------------- */
 
 async function loadKnownDJs() {
   const { data } = await supabase.from("events").select("djs");
@@ -150,15 +125,10 @@ async function loadKnownDJs() {
     try {
       let list = row.djs;
       if (!list) return;
-      if (typeof list === "string") {
-        list = JSON.parse(list.replace(/""/g, '"'));
-      }
-      list.forEach(dj => {
-        if (dj) set.add(dj.toLowerCase());
-      });
+      if (typeof list === "string") list = JSON.parse(list.replace(/""/g, '"'));
+      list.forEach(dj => { if (dj) set.add(dj.toLowerCase()); });
     } catch { }
   });
-
   return Array.from(set);
 }
 
@@ -167,12 +137,7 @@ function detectKnownDJ(text, knownDJs) {
   return knownDJs.some(dj => text.includes(dj));
 }
 
-/* ---------------------------
-INSERT EVENT (Database)
---------------------------- */
-
 async function insertEvent(event) {
-  // Switched to .limit(1) instead of .maybeSingle() to prevent database crashes if duplicates already exist
   const { data: existingRecords, error: lookupError } = await supabase
     .from("events")
     .select("id, source_priority")
@@ -187,52 +152,39 @@ async function insertEvent(event) {
 
   if (existingRecords && existingRecords.length > 0) {
     const existing = existingRecords[0];
-    const existingPriority = existing.source_priority || 0; // Treat null as 0
+    const existingPriority = existing.source_priority || 0;
 
     if (event.source_priority > existingPriority) {
-      const { error: updateError } = await supabase
-        .from("events")
-        .update(event)
-        .eq("id", existing.id);
-
-      if (updateError) {
-        console.log("❌ Update error:", updateError);
-      } else {
-        console.log(`🔁 Event updated: Better dedicated flyer found for ${event.club_name} on ${event.event_date}`);
-      }
+      const { error: updateError } = await supabase.from("events").update(event).eq("id", existing.id);
+      if (updateError) console.log("❌ Update error:", updateError);
+      else console.log(`🔁 Updated: Better dedicated flyer found for ${event.event_date}`);
     } else {
-      console.log(`⏩ Event skipped for ${event.event_date} (Already have an equal or better flyer)`);
+      console.log(`⏩ Skipped ${event.event_date} (Already have equal/better flyer)`);
     }
   } else {
-    const { error } = await supabase
-      .from("events")
-      .insert(event);
-
-    if (error) {
-      console.log("❌ INSERT FAILED:", error);
-    } else {
-      console.log(`📡 DB Insert SUCCESS for ${event.event_date}`);
-    }
+    const { error } = await supabase.from("events").insert(event);
+    if (error) console.log("❌ DB Insert FAILED:", error);
+    else console.log(`📡 DB Insert SUCCESS for ${event.event_date}`);
   }
 }
 
 /* ---------------------------
-SCRAPER
+MAIN SCRAPER
 --------------------------- */
 
 async function run() {
-  console.log("🚀 AfterFive Scraper Starting");
-
+  console.log(`🚀 Starting Single-Scrape for: @${TARGET_CLUB} (Looking 2 weeks back)`);
   const todayString = new Date().toISOString().split("T")[0];
 
   try {
     const knownDJs = await loadKnownDJs();
     console.log(`🎧 Loaded ${knownDJs.length} known DJs`);
 
+    // We increase limit slightly to 20 to make sure we hit 2 weeks of posts for active clubs
     const apifyRun = await apifyClient.actor("apify/instagram-profile-scraper").call({
-      usernames: TARGET_ACCOUNTS,
+      usernames: [TARGET_CLUB],
       resultsType: "posts",
-      resultsLimit: 12
+      resultsLimit: 20 
     });
 
     const { items } = await apifyClient.dataset(apifyRun.defaultDatasetId).listItems();
@@ -242,25 +194,22 @@ async function run() {
       if (profile.latestPosts) posts.push(...profile.latestPosts);
     }
 
-    console.log(`📦 Checking ${posts.length} posts`);
+    console.log(`📦 Fetched ${posts.length} recent posts for @${TARGET_CLUB}`);
 
     for (const post of posts) {
       try {
-        const username = post.ownerUsername || post.username || "unknown";
+        const postDate = post.timestamp || post.takenAt || post.taken_at_timestamp;
 
-        if (!isFromThisWeek(post.timestamp)) continue;
-
-        let images = [];
-        if (post.childPosts?.length) {
-          images = post.childPosts.map(p => p.displayUrl);
-        } else {
-          images = [post.displayUrl];
+        if (!isFromLastTwoWeeks(postDate)) {
+          const formattedDate = postDate ? new Date(postDate).toISOString().split('T')[0] : "Unknown";
+          console.log(`⏳ Skipping old post from ${formattedDate}`);
+          continue;
         }
 
+        let images = post.childPosts?.length ? post.childPosts.map(p => p.displayUrl) : [post.displayUrl];
         const score = captionScore(post.caption);
-        console.log(`\n🔍 Analyzing Post: ${username} | Score ${score} | Images: ${images.length}`);
+        console.log(`\n🔍 Analyzing Post Date: ${new Date(postDate).toISOString().split('T')[0]} | Score ${score} | Images: ${images.length}`);
 
-        // CAROUSEL MEMORY: We will hold the best events from this post before pushing to Supabase
         const bestEventsForThisPost = {};
 
         for (let i = 0; i < images.length; i++) {
@@ -270,7 +219,7 @@ async function run() {
 
           let shouldRunAI = false;
 
-          if (score >= 2 || username === "xinchaomnl") {
+          if (score >= 2 || TARGET_CLUB === "xinchaomnl") {
             shouldRunAI = true;
           } else {
             const text = await extractText(buffer);
@@ -284,29 +233,24 @@ async function run() {
           const prompt = `
             You are an expert nightlife scout. Analyze this flyer.
 
-            Today's date is ${todayString}.
+            CRITICAL DATE INSTRUCTION:
+            Today's date is ${todayString}. Format strictly as YYYY-MM-DD. DO NOT use past years.
 
-            Classify this image as ONE of:
-            - "dedicated_poster": A flyer for a specific single event at a specific venue
-            - "weekly_overview": A schedule showing multiple events across multiple dates  
-            - "artist_promo": A personal artist/DJ promotional post (not venue-specific)
-            - "not_event": Food promo, lifestyle post, no music/DJ content
+            CRITICAL EVENT INSTRUCTIONS:
+            1. Extract events ONLY if they feature DJs, live music, acoustic bands, or nightlife.
+            2. If this flyer is a weekly overview containing multiple different dates, extract EVERY DATE as a separate object.
+            3. If this flyer is a poster for a single specific day, return just one object.
+            4. Ignore food promos without DJs. Set "is_event": false if no music/DJ is listed.
 
-            CRITICAL: "artist_promo" means the post is FROM the artist's own account or 
-            is promoting an individual artist rather than a specific club night. 
-            These should be deprioritized.
-
-            Return JSON:
-            {
-              "image_type": "dedicated_poster" | "weekly_overview" | "artist_promo" | "not_event",
-              "is_event": true/false,
-              "event_name": "",
-              "djs": [],
-              "event_date": "YYYY-MM-DD",   // for dedicated_poster
-              "events": [                    // for weekly_overview, one object per date
-                { "event_name": "", "djs": [], "event_date": "YYYY-MM-DD" }
-              ]
-            }
+            Return a JSON array:
+            [
+              {
+                "is_event": true/false,
+                "event_name": "",
+                "djs": [],
+                "event_date": "YYYY-MM-DD"
+              }
+            ]
           `;
 
           const aiResponse = await fetch(GEMINI_URL, {
@@ -333,57 +277,43 @@ async function run() {
           results = results.filter(r => r && r.is_event);
 
           if (results.length === 0) continue;
-          
+
           const uniqueDatesCount = new Set(results.map(r => r.event_date)).size;
           const sourcePriority = uniqueDatesCount >= 3 ? 2 : 10;
-          
           const posterType = sourcePriority === 10 ? "Dedicated Poster" : "Weekly Overview";
-          console.log(`   ➔ Found ${uniqueDatesCount} date(s) in Image ${i + 1} [Type: ${posterType} | Priority: ${sourcePriority}]`);
+          
+          console.log(`   ➔ Found ${uniqueDatesCount} date(s) in Image ${i + 1} [Type: ${posterType}]`);
 
-          // Save the results to memory, overwriting overviews if a dedicated poster was found for that date
           for (const result of results) {
             const eventDate = result.event_date || todayString;
-
             if (!bestEventsForThisPost[eventDate] || sourcePriority > bestEventsForThisPost[eventDate].sourcePriority) {
-              bestEventsForThisPost[eventDate] = {
-                ...result,
-                buffer, // Hold the image in memory temporarily so we don't upload the bad ones
-                sourcePriority,
-                eventDate
-              };
+              bestEventsForThisPost[eventDate] = { ...result, buffer, sourcePriority, eventDate };
             }
           }
           await new Promise(r => setTimeout(r, 1500));
         }
 
-        // AFTER checking all images in the carousel, push ONLY the winners to Supabase
         const finalDates = Object.keys(bestEventsForThisPost);
         if (finalDates.length > 0) {
-          console.log(`🚀 Uploading ${finalDates.length} winning flyer(s) from this carousel...`);
-          
+          console.log(`🚀 Uploading ${finalDates.length} winning flyer(s)...`);
           for (const date of finalDates) {
             const winningEvent = bestEventsForThisPost[date];
-            
-            // Only now do we host the image (Saves Supabase Storage Space!)
-            const hostedUrl = await hostImage(winningEvent.buffer, username);
+            const hostedUrl = await hostImage(winningEvent.buffer, TARGET_CLUB);
 
             const djNameString = Array.isArray(winningEvent.djs) && winningEvent.djs.length > 0
-              ? winningEvent.djs.join(", ")
-              : (winningEvent.djs || "Headliner");
+              ? winningEvent.djs.join(", ") : (winningEvent.djs || "Headliner");
 
-            const dbPayload = {
+            await insertEvent({
               event_name: winningEvent.event_name || "Special Event",
               dj_name: djNameString,
-              club_name: username,
-              city: "Makati",
+              club_name: TARGET_CLUB,
+              city: "Makati", // You can change this if needed
               event_date: winningEvent.eventDate,
               image_url: hostedUrl,
               ig_post_url: `${post.url}#${winningEvent.eventDate}`, 
               djs: Array.isArray(winningEvent.djs) ? winningEvent.djs : (winningEvent.djs ? [winningEvent.djs] : []),
               source_priority: winningEvent.sourcePriority
-            };
-
-            await insertEvent(dbPayload);
+            });
           }
         }
 

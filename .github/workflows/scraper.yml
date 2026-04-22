@@ -24,7 +24,7 @@ jobs:
         run: npm install
 
       - name: Run Scraper
-        run: update-database.js
+        run: node scripts/update-database.js
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
