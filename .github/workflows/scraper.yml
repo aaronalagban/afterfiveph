@@ -1,9 +1,9 @@
 name: Daily AfterFive Scraper
 
 on:
-  # This runs the script automatically at 6:00 PM Manila Time (10:00 AM UTC)
+  # This runs the script automatically on Mondays and Wednesdays at 12:00 PM Manila Time (4:00 AM UTC)
   schedule:
-    - cron: '0 10 * * *'
+    - cron: '0 4 * * 1,3'
   
   workflow_dispatch:
 

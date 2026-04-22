@@ -298,32 +298,45 @@ export default function AfterFivePop() {
       
       {/* --- BETA MODAL --- */}
       <AnimatePresence>
-        {showBetaModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className={`border p-8 max-w-sm w-full text-center shadow-[0_0_40px_rgba(245,61,4,0.2)] ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]'}`}
-            >
-              <h2 className="font-black text-3xl uppercase mb-4">WIP / BETA</h2>
-              <p className={`font-mono text-sm mb-6 leading-relaxed ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>
-                AfterFive is currently in beta. If you have any suggestions or find bugs, feel free to slide into my DMs:
-                <a href="https://instagram.com/aaronalagbann" target="_blank" rel="noreferrer" className="text-[#F53D04] font-bold block mt-2 hover:underline drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">@aaronalagbann</a>
-                <span className="block mt-4">Currently tracking venues:</span>
-                <span className={`block mt-3 ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>Kampai • Apotheka Manila • Open House World • Uma After Dark • Electric Sala • Ugly Duck</span>
-                <span className={`block mt-4 text-xs ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>Some events may not appear yet due to current automation limits.</span>
-              </p>
-              <button 
-                onClick={() => setShowBetaModal(false)}
-                className={`w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#F53D04] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.4)]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#F53D04] hover:text-[#FFFFFF] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.3)]'}`}
-              >
-                Aight
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+  {showBetaModal && (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }} 
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className={`border p-8 max-w-sm w-full text-center shadow-[0_0_40px_rgba(245,61,4,0.2)] ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]'}`}
+      >
+        <h2 className="font-black text-3xl uppercase mb-4">WIP / BETA</h2>
+        
+        <p className={`font-mono text-sm mb-6 leading-relaxed ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>
+          AfterFive is currently a work in progress. If you have any suggestions or find bugs, feel free to slide into my DMs:
+          <a href="https://instagram.com/aaronalagbann" target="_blank" rel="noreferrer" className="text-[#F53D04] font-bold block mt-2 hover:underline drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">@aaronalagbann</a>
+          <span className={`block mt-4 text-xs ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>Some events may not appear yet due to current automation limits.</span>
+        </p>
+
+        <div className="flex flex-col gap-3">
+          {/* New Submit Button/Link */}
+          <a 
+            href="https://afterfiveph.vercel.app/submit"
+            target="_blank"
+            rel="noreferrer"
+            className={`block w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:border-[#F53D04] hover:text-[#F53D04]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:border-[#F53D04] hover:text-[#F53D04]'}`}
+          >
+            Submit an Event
+          </a>
+
+          {/* Original Aight Button */}
+          <button 
+            onClick={() => setShowBetaModal(false)}
+            className={`w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#F53D04] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.4)]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#F53D04] hover:text-[#FFFFFF] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.3)]'}`}
+          >
+            Aight
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )}
+</AnimatePresence>
 
       {/* --- DESKTOP SIDEBAR --- */}
       <nav className={`hidden md:flex flex-col w-[300px] h-full border-r z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
@@ -353,7 +366,7 @@ export default function AfterFivePop() {
 
         {/* Desktop Footer Toggles */}
         <div className={`p-4 flex justify-between items-center border-t font-mono text-[10px] uppercase tracking-wider ${darkMode ? 'bg-[#151518] border-[#2A2A2E] text-[#B3B3B8]' : 'bg-[#F7F7F9] border-[#E5E5EA] text-[#55555A]'}`}>
-          <a href="/admin/submit" className={`hover:text-[#F53D04] transition-all flex items-center gap-1 group ${darkMode ? 'hover:drop-shadow-[0_0_8px_rgba(245,61,4,0.6)]' : ''}`}>
+          <a href="/submit" className={`hover:text-[#F53D04] transition-all flex items-center gap-1 group ${darkMode ? 'hover:drop-shadow-[0_0_8px_rgba(245,61,4,0.6)]' : ''}`}>
             <Plus size={12} className="group-hover:rotate-90 transition-transform" /> Submit Event
           </a>
           <button onClick={() => setDarkMode(!darkMode)} className={`hover:text-[#F53D04] transition-all flex items-center gap-1 ${darkMode ? 'hover:drop-shadow-[0_0_8px_rgba(245,61,4,0.6)]' : ''}`}>
@@ -372,7 +385,7 @@ export default function AfterFivePop() {
         <div className={`md:hidden h-[60px] w-full border-b flex items-center justify-between px-4 z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
            <img src="/logo-1.png" alt="AfterFive Logo" className="h-6 w-auto" onClick={() => setView("LIVE")} />
            <div className="flex items-center gap-4">
-             <a href="/admin/submit" className={`text-[9px] font-mono uppercase tracking-wider flex items-center gap-0.5 ${darkMode ? 'text-[#B3B3B8] hover:text-[#FFFFFF]' : 'text-[#55555A] hover:text-[#111111]'}`}>
+             <a href="/submit" className={`text-[9px] font-mono uppercase tracking-wider flex items-center gap-0.5 ${darkMode ? 'text-[#B3B3B8] hover:text-[#FFFFFF]' : 'text-[#55555A] hover:text-[#111111]'}`}>
                <Plus size={10} /> Submit
              </a>
              <button onClick={() => setDarkMode(!darkMode)} className={`transition-colors ${darkMode ? 'text-[#B3B3B8] hover:text-[#FFFFFF]' : 'text-[#55555A] hover:text-[#111111]'}`}>
