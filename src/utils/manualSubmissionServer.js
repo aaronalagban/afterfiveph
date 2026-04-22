@@ -58,11 +58,38 @@ export async function approveAndScrapeEvent(pendingEventId) {
   if (!items || items.length === 0) throw new Error("Failed to scrape IG post.");
 
   const postData = items[0];
-  const rawImageUrl = postData.displayUrl || (postData.childPosts && postData.childPosts[0]?.displayUrl);
+
+  // --- Extract img_index from URL ---
+  let targetIndex = 0; // Default to the first image
+  try {
+    const urlObj = new URL(pendingEvent.ig_post_url);
+    const imgIndexParam = urlObj.searchParams.get("img_index");
+    
+    if (imgIndexParam) {
+      const parsedIndex = parseInt(imgIndexParam, 10);
+      // IG's img_index is 1-based (e.g., img_index=2 is the second image)
+      if (!isNaN(parsedIndex) && parsedIndex > 0) {
+        targetIndex = parsedIndex - 1; // Convert to 0-based array index
+      }
+    }
+  } catch (err) {
+    console.warn("Could not parse IG URL, defaulting to first image.");
+  }
+
+  // --- Select the correct image based on the index ---
+  let rawImageUrl;
+  if (postData.childPosts && postData.childPosts.length > 0) {
+    // Make sure the index isn't out of bounds, otherwise fallback to index 0
+    const safeIndex = targetIndex < postData.childPosts.length ? targetIndex : 0;
+    rawImageUrl = postData.childPosts[safeIndex]?.displayUrl;
+  } else {
+    // If it's a single image post (not a carousel), just use the main display URL
+    rawImageUrl = postData.displayUrl;
+  }
 
   if (!rawImageUrl) throw new Error("Could not extract image from post.");
 
-  console.log("📥 Downloading image...");
+  console.log(`📥 Downloading image (Index: ${targetIndex})...`);
 
   // 3. Download and Upload Image
   const imgRes = await fetch(rawImageUrl);

@@ -17,7 +17,7 @@ export interface CommunityDirectoryItem {
   cover_image_url?: string;
 }
 
-const ACCESS_PASSWORD = "MANILA"; 
+const ACCESS_PASSWORD = "MANILA";
 
 // --- INTERACTIVE 3D WAVE CANVAS ---
 const InteractiveWavyGrid = ({ darkMode }: { darkMode: boolean }) => {

@@ -12,7 +12,7 @@ export const viewport: Viewport = {
 // 2. Comprehensive Metadata
 export const metadata: Metadata = {
   title: {
-    default: 'AfterFivePH | The Ultimate Manila Nightlife Directory',
+    default: 'AfterFivePH | Manila Nightlife Directory',
     template: '%s | AfterFivePH'
   },
   description: 'The definitive directory for Manila nightlife. Discover the best bars, clubs, speakeasies, and events in Makati, BGC, and across the metro. Find your vibe after five.',
