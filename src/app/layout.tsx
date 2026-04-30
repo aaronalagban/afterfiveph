@@ -1,16 +1,19 @@
 import { Analytics } from "@vercel/analytics/react";
 import './globals.css'; 
 import type { Metadata, Viewport } from 'next';
+import type { ReactNode } from 'react';
 
 // 1. Viewport settings (separate from metadata in Next.js 14+)
 export const viewport: Viewport = {
   themeColor: '#000000', // Set this to your brand's primary color
   width: 'device-width',
   initialScale: 1,
+  viewportFit: 'cover',
 };
 
 // 2. Comprehensive Metadata
 export const metadata: Metadata = {
+  metadataBase: new URL('https://afterfive.ph'),
   title: {
     default: 'AfterFivePH | Manila Nightlife Directory',
     template: '%s | AfterFivePH'
@@ -73,7 +76,7 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   // 3. JSON-LD Structured Data (The "Secret Sauce" for SEO)
   const jsonLd = {

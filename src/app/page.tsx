@@ -107,10 +107,12 @@ const darkMapStyle = [
   { featureType: "water", elementType: "geometry", stylers: [{ color: "#3A6E8F" }] },
 ];
 
+const INTRO_SEEN_KEY = "afterfive-intro-seen";
+
 export default function AfterFivePop() {
   const [events, setEvents] = useState<AfterFiveEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
   const [showBetaModal, setShowBetaModal] = useState(false);
   const [view, setView] = useState<"LIVE" | "AGENDA" | "MAP" | "ARCHIVE">("LIVE");
   const [darkMode, setDarkMode] = useState(false);
@@ -131,10 +133,19 @@ export default function AfterFivePop() {
   }, [darkMode]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowSplash(false);
-      setShowBetaModal(true); 
-    }, 3500);
+    const hasSeenIntro = localStorage.getItem(INTRO_SEEN_KEY) === "1";
+    let splashTimer: NodeJS.Timeout | undefined;
+
+    if (hasSeenIntro) {
+      setShowBetaModal(true);
+    } else {
+      setShowSplash(true);
+      localStorage.setItem(INTRO_SEEN_KEY, "1");
+      splashTimer = setTimeout(() => {
+        setShowSplash(false);
+        setShowBetaModal(true);
+      }, 3500);
+    }
 
     async function init() {
       if (!supabase) { setLoading(false); return; }
@@ -184,7 +195,9 @@ export default function AfterFivePop() {
       setLoading(false);
     }
     init();
-    return () => clearTimeout(timer);
+    return () => {
+      if (splashTimer) clearTimeout(splashTimer);
+    };
   }, []);
 
   const getLogicalToday = () => {
@@ -270,6 +283,37 @@ export default function AfterFivePop() {
         @keyframes marquee-title {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
+        }
+
+        .overview-tile-panel {
+          transform: translateY(0);
+          opacity: 1;
+          transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms cubic-bezier(0.22, 1, 0.36, 1);
+          will-change: transform, opacity;
+        }
+
+        @media (min-width: 768px) {
+          .overview-tile-panel {
+            transform: translateY(calc(100% - 68px));
+            opacity: 0.96;
+          }
+
+          .overview-tile:hover .overview-tile-panel,
+          .overview-tile:focus-within .overview-tile-panel {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+
+        @media (max-width: 767px) {
+          .mobile-safe-bottom {
+            padding-bottom: calc(3rem + env(safe-area-inset-bottom, 0px));
+          }
+
+          .mobile-nav-safe {
+            height: calc(3rem + env(safe-area-inset-bottom, 0px));
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+          }
         }
       `}} />
 
@@ -390,11 +434,18 @@ export default function AfterFivePop() {
            </div>
         </div>
 
-        <div className="flex-1 w-full relative overflow-y-auto hide-scrollbar pb-[50px] md:pb-0">
+        <div className="mobile-safe-bottom flex-1 w-full relative overflow-y-auto hide-scrollbar md:pb-0">
           <AnimatePresence mode="wait">
             {!loading && (
               <>
-                {view === "LIVE" && <GalleryView key="LIVE" events={galleryData} darkMode={darkMode} />}
+                {view === "LIVE" && (
+                  <GalleryView
+                    key={`LIVE-${today}-${tonightEvents.length}`}
+                    events={galleryData}
+                    todayEvents={tonightEvents}
+                    darkMode={darkMode}
+                  />
+                )}
                 {view === "AGENDA" && <BlockListView key="AGENDA" title="INCOMING" events={upcomingEvents} darkMode={darkMode} />}
                 {view === "MAP" && <MapView key="MAP" isLoaded={isMapLoaded} darkMode={darkMode} />}
                 {view === "ARCHIVE" && <ArchiveCalendarView key="ARCHIVE" events={pastEvents} darkMode={darkMode} />}
@@ -405,7 +456,7 @@ export default function AfterFivePop() {
       </main>
 
       {/* --- Mobile Nav --- */}
-      <div className={`md:hidden fixed bottom-0 left-0 w-full h-12 border-t z-50 flex items-stretch ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+      <div className={`mobile-nav-safe md:hidden fixed bottom-0 left-0 w-full border-t z-50 flex items-stretch ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
          <MobileNavBtn icon={<Zap size={18} />} active={view === "LIVE"} onClick={() => setView("LIVE")} color="#F53D04" darkMode={darkMode} />
          <div className={`w-[1px] h-full ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
          <MobileNavBtn icon={<Calendar size={18} />} active={view === "AGENDA"} onClick={() => setView("AGENDA")} color={darkMode ? "#5C548A" : "#7A7399"} darkMode={darkMode} />
@@ -430,8 +481,13 @@ interface ViewProps {
   darkMode: boolean;
 }
 
-function GalleryView({ events, darkMode }: ViewProps) {
+interface GalleryViewProps extends ViewProps {
+  todayEvents: AfterFiveEvent[];
+}
+
+function GalleryView({ events, todayEvents, darkMode }: GalleryViewProps) {
   const [current, setCurrent] = useState(0);
+  const [showOverview, setShowOverview] = useState(todayEvents.length > 0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const resetTimer = useCallback(() => {
@@ -453,6 +509,10 @@ function GalleryView({ events, darkMode }: ViewProps) {
 
   if (!events || events.length === 0) return <EmptyState darkMode={darkMode} />;
 
+  if (showOverview) {
+    return <TodayOverview events={todayEvents} darkMode={darkMode} onContinue={() => setShowOverview(false)} />;
+  }
+
   const activeEvent = events[current];
   const title = activeEvent.event_name || "LIVE SESSION";
   const dateObj = new Date(activeEvent.event_date);
@@ -464,6 +524,18 @@ function GalleryView({ events, darkMode }: ViewProps) {
       className={`w-full h-full flex flex-col relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D]' : 'bg-[#FFFFFF]'}`}
     >
        <div className={`absolute inset-0 pointer-events-none ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
+       {todayEvents.length > 0 && (
+        <button
+          onClick={() => setShowOverview(true)}
+          className={`absolute top-4 right-4 md:top-6 md:right-6 z-30 px-4 py-2 md:px-5 md:py-3 font-black uppercase tracking-widest text-[10px] md:text-xs transition-colors border flex items-center justify-center gap-2 ${
+            darkMode
+              ? 'bg-[#151518]/95 text-[#FFFFFF] border-[#2A2A2E] hover:border-[#F53D04] hover:text-[#F53D04]'
+              : 'bg-[#FFFFFF]/95 text-[#111111] border-[#E5E5EA] hover:border-[#F53D04] hover:text-[#F53D04]'
+          }`}
+        >
+          <Calendar size={16} /> Tonight
+        </button>
+       )}
       
        <div className="flex-1 relative flex items-center justify-center p-6 md:p-12 overflow-hidden">
           <div className={`absolute inset-0 opacity-10 transition-colors duration-1000 ${current % 2 === 0 ? 'bg-[#F53D04]' : 'bg-[#5C548A]'}`} />
@@ -478,21 +550,21 @@ function GalleryView({ events, darkMode }: ViewProps) {
           </AnimatePresence>
        </div>
 
-       <div className={`h-auto shrink-0 border-t flex flex-row md:items-stretch z-20 relative ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+       <div className={`h-[220px] md:h-[240px] lg:h-[250px] shrink-0 border-t flex flex-row md:items-stretch z-20 relative ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
           <div className={`w-1/4 md:w-[200px] shrink-0 border-r p-2 md:p-4 flex flex-col justify-center items-center text-center ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#F53D04]' : 'bg-[#FFE5DE] border-[#E5E5EA] text-[#F53D04]'}`}>
              <span className="font-mono font-bold text-[8px] md:text-sm uppercase tracking-widest mb-1 text-inherit hidden md:block">Happening</span>
              <span className="font-black text-3xl md:text-6xl uppercase leading-none text-inherit">{new Date(activeEvent.event_date).getDate()}</span>
              <span className="font-black text-[10px] md:text-xl uppercase text-inherit">{new Date(activeEvent.event_date).toLocaleDateString("en-US", { month: 'short' })}</span>
           </div>
 
-          <div className="flex-1 flex flex-col justify-center relative overflow-hidden min-w-0">
+          <div className="flex-1 flex flex-col relative overflow-hidden min-w-0 h-full">
              <div className={`w-full h-5 md:h-7 flex items-center overflow-hidden shrink-0 ${darkMode ? 'bg-[#0B0B0D] text-[#6E6E73]' : 'bg-[#E5E5EA] text-[#8C8C92]'}`}>
                <Marquee text={`${title} / ${formattedDate} // `} />
              </div>
              
-             <div className={`p-3 md:p-6 overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4 ${darkMode ? 'bg-[#151518]' : 'bg-[#F7F7F9]'}`}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-col justify-center overflow-hidden">
+             <div className={`p-3 md:p-6 overflow-hidden flex-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 md:gap-4 min-h-0 ${darkMode ? 'bg-[#151518]' : 'bg-[#F7F7F9]'}`}>
+                <div className="min-w-0 max-h-full overflow-y-auto pr-1 md:pr-2 flex items-center">
+                  <div className="flex flex-col overflow-hidden w-full">
                     <h3 className="font-black text-lg md:text-3xl uppercase text-[#F53D04] mb-1 line-clamp-1 drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">
                       {activeEvent.club_name}
                     </h3>
@@ -500,7 +572,7 @@ function GalleryView({ events, darkMode }: ViewProps) {
                     {title.length > 25 ? (
                       <div className="whitespace-nowrap overflow-hidden py-1">
                          <h2 className={`animate-marquee-title font-black text-3xl md:text-5xl uppercase ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
-                            {title}  ///  {title}  ///  
+                            {`${title} • ${title} • `}
                          </h2>
                       </div>
                     ) : (
@@ -508,23 +580,146 @@ function GalleryView({ events, darkMode }: ViewProps) {
                          {title}
                       </h2>
                     )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 md:gap-2 mt-2">
-                    {(activeEvent.dj_names || []).map((dj, i) => (
+                    <div className="flex flex-wrap gap-1.5 md:gap-2 mt-2">
+                      {(activeEvent.dj_names || []).map((dj, i) => (
                         <span key={i} className={`px-2.5 py-1 md:px-3 md:py-1.5 font-mono font-bold text-[10px] md:text-sm uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#FFFFFF] text-[#55555A] border-[#E5E5EA]'}`}>
                           {dj}
                         </span>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                <a href={activeEvent.ig_post_url} target="_blank" rel="noreferrer" className={`px-5 py-3 md:px-8 md:py-4 font-black uppercase tracking-widest text-[10px] md:text-xs transition-colors shadow-[0_0_15px_rgba(245,61,4,0.4)] flex items-center justify-center gap-2 shrink-0 ${darkMode ? 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#FF4D1A] hover:shadow-[0_0_25px_rgba(245,61,4,0.6)]' : 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#D93600]'}`}>
-                   <Instagram size={18} /> <span className="hidden md:inline">VIEW</span> INSTAGRAM
-                </a>
+                <div className="shrink-0 flex items-center justify-center self-center">
+                  <a href={activeEvent.ig_post_url} target="_blank" rel="noreferrer" className={`px-4 py-3 md:px-5 md:py-4 font-black uppercase tracking-widest text-[10px] md:text-xs transition-colors shadow-[0_0_15px_rgba(245,61,4,0.4)] inline-flex items-center justify-center gap-2 text-center ${darkMode ? 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#FF4D1A] hover:shadow-[0_0_25px_rgba(245,61,4,0.6)]' : 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#D93600]'}`}>
+                     <Instagram size={18} /> <span>View on Instagram</span>
+                  </a>
+                </div>
              </div>
           </div>
        </div>
+    </motion.div>
+  );
+}
+
+function TodayOverview({
+  events,
+  darkMode,
+  onContinue,
+}: {
+  events: AfterFiveEvent[];
+  darkMode: boolean;
+  onContinue: () => void;
+}) {
+  return (
+    <motion.div
+      variants={TAB_VARIANTS}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className={`w-full h-full flex flex-col relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D]' : 'bg-[#FFFFFF]'}`}
+    >
+      <div className={`absolute inset-0 pointer-events-none ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
+
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col p-4 md:p-10">
+        <div className="max-w-6xl w-full mx-auto flex-1 min-h-0 flex flex-col gap-4 md:gap-6">
+          <div className={`sticky top-0 z-20 border p-3 md:p-4 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="font-mono font-bold text-[10px] md:text-xs uppercase tracking-[0.3em] text-[#F53D04] mb-2">
+                  Tonight
+                </div>
+                <h1 className={`font-black text-2xl md:text-4xl uppercase leading-none ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
+                  {events.length} Events Today
+                </h1>
+              </div>
+              <button
+                onClick={onContinue}
+                className={`shrink-0 px-4 py-3 font-black text-[10px] md:text-xs uppercase tracking-[0.2em] border transition-colors ${
+                  darkMode
+                    ? 'bg-[#F53D04] text-[#FFFFFF] border-[#F53D04] hover:bg-[#FF4D1A]'
+                    : 'bg-[#F53D04] text-[#FFFFFF] border-[#F53D04] hover:bg-[#D93600]'
+                }`}
+              >
+                View Posters
+              </button>
+            </div>
+            <div className={`mt-2 font-mono text-[10px] md:text-[11px] uppercase tracking-[0.2em] ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>
+              Tonight&apos;s poster wall
+            </div>
+          </div>
+
+          <div
+            className="flex-1 min-h-0 overflow-y-auto hide-scrollbar"
+          >
+            <div
+            className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 pb-4"
+          >
+            {events.map((event, index) => (
+              <div
+                key={`${event.id ?? event.club_name}-${index}`}
+                className={`overview-tile group relative aspect-[3/4] border overflow-hidden ${darkMode ? 'bg-[#151518] border-[#2A2A2E] hover:shadow-[0_0_28px_rgba(245,61,4,0.28)]' : 'bg-[#FFFFFF] border-[#E5E5EA] hover:shadow-[0_0_24px_rgba(245,61,4,0.18)]'} transition-[box-shadow,border-color,transform] duration-200 hover:border-[#F53D04] hover:-translate-y-0.5`}
+              >
+                <div className="absolute inset-0 overflow-hidden flex items-center justify-center">
+                  {event.image_url ? (
+                    <img
+                      src={event.image_url}
+                      alt={`${event.club_name} poster`}
+                      className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+                    />
+                  ) : (
+                    <div className={`w-full h-full flex items-center justify-center p-4 text-center font-black text-lg uppercase ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>
+                      Poster Coming Soon
+                    </div>
+                  )}
+                </div>
+
+                <div className="absolute inset-x-0 bottom-0 p-2 md:p-3 pointer-events-none overflow-hidden">
+                  <div className={`overview-tile-panel border px-3 py-3 md:px-4 md:py-4 overflow-y-auto pointer-events-auto max-h-[42%] md:max-h-[46%] ${darkMode ? 'bg-[#0B0B0D]/88 border-[#2A2A2E]' : 'bg-[#FFFFFF]/92 border-[#E5E5EA]'} backdrop-blur-sm`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-black text-[#F53D04] text-xs md:text-sm uppercase line-clamp-1">
+                          {event.club_name}
+                        </div>
+                        <div className={`font-black text-sm md:text-base uppercase leading-tight mt-1 ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
+                          {event.event_name || "Club Night"}
+                        </div>
+                      </div>
+                      <div className={`shrink-0 px-2 py-1 border font-mono font-bold text-[9px] md:text-[10px] uppercase ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#F2F2F5] text-[#55555A] border-[#E5E5EA]'}`}>
+                        Today
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {(event.dj_names || []).map((dj, djIndex) => (
+                        <span
+                          key={djIndex}
+                          className={`px-2 py-1 font-mono font-bold text-[9px] md:text-[10px] uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#F7F7F9] text-[#55555A] border-[#E5E5EA]'}`}
+                        >
+                          {dj}
+                        </span>
+                      ))}
+                    </div>
+
+                    {event.ig_post_url && (
+                      <a
+                        href={event.ig_post_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`mt-3 inline-flex items-center gap-2 font-black text-[10px] uppercase tracking-[0.2em] ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}
+                      >
+                        <Instagram size={13} />
+                        Instagram
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 }

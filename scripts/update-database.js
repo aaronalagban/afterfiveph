@@ -7,6 +7,22 @@ import { execSync } from "child_process";
 
 dotenv.config({ path: ".env.local" });
 
+const REQUIRED_ENV = [
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "APIFY_API_TOKEN",
+  "GEMINI_API_KEY"
+];
+
+function assertRequiredEnv() {
+  const missing = REQUIRED_ENV.filter(name => !process.env[name]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variable(s): ${missing.join(", ")}`);
+  }
+}
+
+assertRequiredEnv();
+
 /* ---------------------------
   SUPABASE
 --------------------------- */
@@ -28,8 +44,9 @@ const apifyClient = new ApifyClient({
   GEMINI
 --------------------------- */
 
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 const GEMINI_URL =
-  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`;
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 /* ---------------------------
   TARGET CLUBS
@@ -157,6 +174,23 @@ function safeJSON(text) {
     console.debug("⚠️  JSON parse failed. Raw snippet:", text.slice(0, 150));
     return null;
   }
+}
+
+function describeGeminiFailure(aiResponse, aiData) {
+  if (aiData?.error) {
+    return `HTTP ${aiResponse.status} ${aiData.error.status ?? ""}: ${aiData.error.message}`;
+  }
+
+  if (aiData?.promptFeedback?.blockReason) {
+    return `Prompt blocked: ${aiData.promptFeedback.blockReason}`;
+  }
+
+  const candidate = aiData?.candidates?.[0];
+  if (candidate?.finishReason && candidate.finishReason !== "STOP") {
+    return `Candidate stopped: ${candidate.finishReason}${candidate.finishMessage ? ` (${candidate.finishMessage})` : ""}`;
+  }
+
+  return `HTTP ${aiResponse.status}: response did not include text`;
 }
 
 /* ---------------------------
@@ -345,21 +379,27 @@ async function classifyImage(buffer, todayString) {
 
   const aiResponse = await fetch(GEMINI_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": process.env.GEMINI_API_KEY
+    },
     body: JSON.stringify({
       contents: [{
         parts: [
           { text: prompt },
           { inlineData: { mimeType: "image/jpeg", data: buffer.toString("base64") } }
         ]
-      }]
+      }],
+      generationConfig: {
+        responseMimeType: "application/json"
+      }
     })
   });
 
   const aiData = await aiResponse.json();
 
   if (!aiData.candidates?.[0]?.content?.parts?.[0]?.text) {
-    console.debug("⚠️  Gemini returned no candidates");
+    console.debug(`⚠️  Gemini returned no usable text from ${GEMINI_MODEL}: ${describeGeminiFailure(aiResponse, aiData)}`);
     return null;
   }
 
@@ -380,6 +420,8 @@ async function run() {
   const todayString = new Date().toISOString().split("T")[0];
 
   try {
+    console.log(`🤖 Gemini model: ${GEMINI_MODEL}`);
+
     const knownDJs = await loadKnownDJs();
     console.log(`🎧 Loaded ${knownDJs.length} known DJs`);
 
