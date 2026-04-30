@@ -392,7 +392,6 @@ export default function AfterFivePop() {
           <SidebarLink label="MAP" sub="VENUES" active={view === "MAP"} onClick={() => setView("MAP")} color={darkMode ? "#3A6E8F" : "#5F8EA8"} icon={<MapIcon />} darkMode={darkMode} />
           <SidebarLink label="ARCHIVES" sub="WHAT YOU MISSED" active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} color={darkMode ? "#8F4A5A" : "#A06A75"} icon={<Disc />} darkMode={darkMode} />
           
-          {/* make sure communities tab pops out */}
           <SidebarLink 
             href="/communities" 
             label="COMMUNITIES" 
@@ -466,7 +465,6 @@ export default function AfterFivePop() {
          <MobileNavBtn icon={<Disc size={18} />} active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} color={darkMode ? "#8F4A5A" : "#A06A75"} darkMode={darkMode} />
          <div className={`w-[1px] h-full ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
          
-         {/* communities tab (mobile) */}
          <MobileNavBtn href="/communities" icon={<Users size={18} />} active={false} color={darkMode ? "#10B981" : "#059669"} darkMode={darkMode} highlight={true} />
       </div>
 
@@ -510,7 +508,18 @@ function GalleryView({ events, todayEvents, darkMode }: GalleryViewProps) {
   if (!events || events.length === 0) return <EmptyState darkMode={darkMode} />;
 
   if (showOverview) {
-    return <TodayOverview events={todayEvents} darkMode={darkMode} onContinue={() => setShowOverview(false)} />;
+    return (
+      <TodayOverview 
+        events={todayEvents} 
+        darkMode={darkMode} 
+        onContinue={() => setShowOverview(false)} 
+        onSelect={(index) => {
+          setCurrent(index);
+          setShowOverview(false);
+          resetTimer();
+        }}
+      />
+    );
   }
 
   const activeEvent = events[current];
@@ -562,36 +571,37 @@ function GalleryView({ events, todayEvents, darkMode }: GalleryViewProps) {
                <Marquee text={`${title} / ${formattedDate} // `} />
              </div>
              
-             <div className={`p-3 md:p-6 overflow-hidden flex-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 md:gap-4 min-h-0 ${darkMode ? 'bg-[#151518]' : 'bg-[#F7F7F9]'}`}>
-                <div className="min-w-0 max-h-full overflow-y-auto pr-1 md:pr-2 flex items-center">
-                  <div className="flex flex-col overflow-hidden w-full">
-                    <h3 className="font-black text-lg md:text-3xl uppercase text-[#F53D04] mb-1 line-clamp-1 drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">
-                      {activeEvent.club_name}
-                    </h3>
-                    
-                    {title.length > 25 ? (
-                      <div className="whitespace-nowrap overflow-hidden py-1">
-                         <h2 className={`animate-marquee-title font-black text-3xl md:text-5xl uppercase ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
-                            {`${title} • ${title} • `}
-                         </h2>
-                      </div>
-                    ) : (
-                      <h2 className={`font-black uppercase leading-[0.85] line-clamp-2 mb-2 ${darkMode ? 'text-[#FFFFFF] drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]' : 'text-[#111111] drop-shadow-[0_0_10px_rgba(0,0,0,0.05)]'}`} style={{ fontSize: 'clamp(1.5rem, 5vw, 3rem)' }}>
-                         {title}
-                      </h2>
-                    )}
-                    <div className="flex flex-wrap gap-1.5 md:gap-2 mt-2">
-                      {(activeEvent.dj_names || []).map((dj, i) => (
-                        <span key={i} className={`px-2.5 py-1 md:px-3 md:py-1.5 font-mono font-bold text-[10px] md:text-sm uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#FFFFFF] text-[#55555A] border-[#E5E5EA]'}`}>
-                          {dj}
-                        </span>
-                      ))}
+             <div className={`p-4 md:p-6 overflow-y-auto flex-1 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 min-h-0 ${darkMode ? 'bg-[#151518]' : 'bg-[#F7F7F9]'}`}>
+                {/* Group 1: Venue, Title, DJs */}
+                <div className="flex flex-col min-w-0 w-full md:flex-1">
+                  <h3 className="font-black text-lg md:text-3xl uppercase text-[#F53D04] mb-1 line-clamp-1 drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">
+                    {activeEvent.club_name}
+                  </h3>
+                  
+                  {title.length > 25 ? (
+                    <div className="whitespace-nowrap overflow-hidden py-1">
+                       <h2 className={`animate-marquee-title font-black text-3xl md:text-5xl uppercase ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
+                          {`${title} • ${title} • `}
+                       </h2>
                     </div>
+                  ) : (
+                    <h2 className={`font-black uppercase leading-[0.85] line-clamp-2 mb-2 ${darkMode ? 'text-[#FFFFFF] drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]' : 'text-[#111111] drop-shadow-[0_0_10px_rgba(0,0,0,0.05)]'}`} style={{ fontSize: 'clamp(1.5rem, 5vw, 3rem)' }}>
+                       {title}
+                    </h2>
+                  )}
+
+                  <div className="flex flex-wrap gap-1.5 md:gap-2 mt-2">
+                    {(activeEvent.dj_names || []).map((dj, i) => (
+                      <span key={i} className={`px-2.5 py-1 md:px-3 md:py-1.5 font-mono font-bold text-[10px] md:text-sm uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#FFFFFF] text-[#55555A] border-[#E5E5EA]'}`}>
+                        {dj}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
-                <div className="shrink-0 flex items-center justify-center self-center">
-                  <a href={activeEvent.ig_post_url} target="_blank" rel="noreferrer" className={`px-4 py-3 md:px-5 md:py-4 font-black uppercase tracking-widest text-[10px] md:text-xs transition-colors shadow-[0_0_15px_rgba(245,61,4,0.4)] inline-flex items-center justify-center gap-2 text-center ${darkMode ? 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#FF4D1A] hover:shadow-[0_0_25px_rgba(245,61,4,0.6)]' : 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#D93600]'}`}>
+                {/* Group 2: Instagram Button */}
+                <div className="shrink-0 w-full md:w-auto mt-1 md:mt-0 flex items-center justify-center">
+                  <a href={activeEvent.ig_post_url} target="_blank" rel="noreferrer" className={`w-full md:w-auto px-4 py-3 md:px-5 md:py-4 font-black uppercase tracking-widest text-[10px] md:text-xs transition-colors shadow-[0_0_15px_rgba(245,61,4,0.4)] inline-flex items-center justify-center gap-2 text-center ${darkMode ? 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#FF4D1A] hover:shadow-[0_0_25px_rgba(245,61,4,0.6)]' : 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#D93600]'}`}>
                      <Instagram size={18} /> <span>View on Instagram</span>
                   </a>
                 </div>
@@ -606,10 +616,12 @@ function TodayOverview({
   events,
   darkMode,
   onContinue,
+  onSelect,
 }: {
   events: AfterFiveEvent[];
   darkMode: boolean;
   onContinue: () => void;
+  onSelect: (index: number) => void;
 }) {
   return (
     <motion.div
@@ -641,81 +653,74 @@ function TodayOverview({
                     : 'bg-[#F53D04] text-[#FFFFFF] border-[#F53D04] hover:bg-[#D93600]'
                 }`}
               >
-                View Posters
+                POSTER VIEW
               </button>
             </div>
             <div className={`mt-2 font-mono text-[10px] md:text-[11px] uppercase tracking-[0.2em] ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>
-              Tonight&apos;s poster wall
+              Tap a poster to view details
             </div>
           </div>
 
-          <div
-            className="flex-1 min-h-0 overflow-y-auto hide-scrollbar"
-          >
-            <div
-            className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 pb-4"
-          >
-            {events.map((event, index) => (
-              <div
-                key={`${event.id ?? event.club_name}-${index}`}
-                className={`overview-tile group relative aspect-[3/4] border overflow-hidden ${darkMode ? 'bg-[#151518] border-[#2A2A2E] hover:shadow-[0_0_28px_rgba(245,61,4,0.28)]' : 'bg-[#FFFFFF] border-[#E5E5EA] hover:shadow-[0_0_24px_rgba(245,61,4,0.18)]'} transition-[box-shadow,border-color,transform] duration-200 hover:border-[#F53D04] hover:-translate-y-0.5`}
-              >
-                <div className="absolute inset-0 overflow-hidden flex items-center justify-center">
-                  {event.image_url ? (
-                    <img
-                      src={event.image_url}
-                      alt={`${event.club_name} poster`}
-                      className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
-                    />
-                  ) : (
-                    <div className={`w-full h-full flex items-center justify-center p-4 text-center font-black text-lg uppercase ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>
-                      Poster Coming Soon
-                    </div>
-                  )}
-                </div>
-
-                <div className="absolute inset-x-0 bottom-0 p-2 md:p-3 pointer-events-none overflow-hidden">
-                  <div className={`overview-tile-panel border px-3 py-3 md:px-4 md:py-4 overflow-y-auto pointer-events-auto max-h-[42%] md:max-h-[46%] ${darkMode ? 'bg-[#0B0B0D]/88 border-[#2A2A2E]' : 'bg-[#FFFFFF]/92 border-[#E5E5EA]'} backdrop-blur-sm`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-black text-[#F53D04] text-xs md:text-sm uppercase line-clamp-1">
-                          {event.club_name}
-                        </div>
-                        <div className={`font-black text-sm md:text-base uppercase leading-tight mt-1 ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
-                          {event.event_name || "Club Night"}
-                        </div>
+          <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 pb-4">
+              {events.map((event, index) => (
+                <div
+                  key={`${event.id ?? event.club_name}-${index}`}
+                  onClick={() => onSelect(index)}
+                  className={`overview-tile group relative aspect-[3/4] w-full border overflow-hidden cursor-pointer ${darkMode ? 'bg-[#151518] border-[#2A2A2E] hover:shadow-[0_0_28px_rgba(245,61,4,0.28)]' : 'bg-[#FFFFFF] border-[#E5E5EA] hover:shadow-[0_0_24px_rgba(245,61,4,0.18)]'} transition-[box-shadow,border-color,transform] duration-200 hover:border-[#F53D04] hover:-translate-y-0.5`}
+                >
+                  <div className="absolute inset-0 overflow-hidden flex items-center justify-center">
+                    {event.image_url ? (
+                      <img
+                        src={event.image_url}
+                        alt={`${event.club_name} poster`}
+                        className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+                      />
+                    ) : (
+                      <div className={`w-full h-full flex items-center justify-center p-4 text-center font-black text-lg uppercase ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>
+                        Poster Coming Soon
                       </div>
-                      <div className={`shrink-0 px-2 py-1 border font-mono font-bold text-[9px] md:text-[10px] uppercase ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#F2F2F5] text-[#55555A] border-[#E5E5EA]'}`}>
-                        Today
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {(event.dj_names || []).map((dj, djIndex) => (
-                        <span
-                          key={djIndex}
-                          className={`px-2 py-1 font-mono font-bold text-[9px] md:text-[10px] uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#F7F7F9] text-[#55555A] border-[#E5E5EA]'}`}
-                        >
-                          {dj}
-                        </span>
-                      ))}
-                    </div>
-
-                    {event.ig_post_url && (
-                      <a
-                        href={event.ig_post_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`mt-3 inline-flex items-center gap-2 font-black text-[10px] uppercase tracking-[0.2em] ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}
-                      >
-                        <Instagram size={13} />
-                        Instagram
-                      </a>
                     )}
                   </div>
+
+                  {/* Hover Info Panel - Hidden on Mobile */}
+                  <div className="hidden md:block absolute inset-x-0 bottom-0 p-2 md:p-3 pointer-events-none overflow-hidden">
+                    <div className={`overview-tile-panel border px-3 py-3 md:px-4 md:py-4 overflow-y-auto pointer-events-auto max-h-[42%] md:max-h-[46%] ${darkMode ? 'bg-[#0B0B0D]/88 border-[#2A2A2E]' : 'bg-[#FFFFFF]/92 border-[#E5E5EA]'} backdrop-blur-sm`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-black text-[#F53D04] text-xs md:text-sm uppercase line-clamp-1">
+                            {event.club_name}
+                          </div>
+                          <div className={`font-black text-sm md:text-base uppercase leading-tight mt-1 ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
+                            {event.event_name || "Club Night"}
+                          </div>
+                        </div>
+                        <div className={`shrink-0 px-2 py-1 border font-mono font-bold text-[9px] md:text-[10px] uppercase ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#F2F2F5] text-[#55555A] border-[#E5E5EA]'}`}>
+                          Today
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {(event.dj_names || []).map((dj, djIndex) => (
+                          <span
+                            key={djIndex}
+                            className={`px-2 py-1 font-mono font-bold text-[9px] md:text-[10px] uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#F7F7F9] text-[#55555A] border-[#E5E5EA]'}`}
+                          >
+                            {dj}
+                          </span>
+                        ))}
+                      </div>
+
+                      {event.ig_post_url && (
+                        <div className={`mt-3 inline-flex items-center gap-2 font-black text-[10px] uppercase tracking-[0.2em] ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
+                          <Instagram size={13} />
+                          Instagram
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
             </div>
           </div>
         </div>
@@ -1019,5 +1024,4 @@ function EmptyState({ darkMode }: { darkMode?: boolean }) {
       <h1 className="font-black text-2xl uppercase mb-2">NO SIGNAL</h1>
       <p className={`font-mono font-bold text-xs ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>Check back later or view the Agenda.</p>
     </div>
-  ); 
-}
+  ); }
