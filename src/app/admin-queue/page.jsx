@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Check, X, Loader, ExternalLink, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -47,7 +47,7 @@ export default function AdminQueue() {
         const data = await res.json();
         alert(`Error: ${data.message}`);
       }
-    } catch (e) {
+    } catch {
       alert("Sys fail");
     } finally {
       setProcessingId(null);

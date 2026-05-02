@@ -1,7 +1,10 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import React, { useState, useEffect } from 'react';
-import { UploadCloud, CheckCircle, XCircle, Loader, ArrowRight, ArrowLeft, Sun, Moon, Home } from 'lucide-react';
+import Link from 'next/link';
+import { CheckCircle, XCircle, Loader, ArrowRight, ArrowLeft, Sun, Moon, Home } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const variants = {
@@ -133,7 +136,7 @@ export default function ManualSubmissionForm() {
         return (
           <div className="space-y-4">
             <h2 className="font-black text-3xl md:text-4xl uppercase leading-none">The Gig</h2>
-            <p className={`font-mono text-xs uppercase tracking-widest ${darkMode ? 'text-[#00E5FF]' : 'text-neutral-500'}`}>What's the event name?</p>
+            <p className={`font-mono text-xs uppercase tracking-widest ${darkMode ? 'text-[#00E5FF]' : 'text-neutral-500'}`}>What&apos;s the event name?</p>
             <input
               type="text" autoFocus value={eventName}
               onChange={(e) => setEventName(e.target.value)}
@@ -220,7 +223,7 @@ export default function ManualSubmissionForm() {
       {/* Header */}
       <div className={`relative z-10 w-full border-b-2 p-4 flex justify-between items-center shrink-0 ${darkMode ? 'bg-[#000] border-neutral-800' : 'bg-white border-black'}`}>
         <div className="flex items-center gap-5">
-          <a href="/" className={`p-1.5 border-2 transition-colors ${darkMode ? 'border-neutral-700 text-white hover:bg-neutral-800' : 'border-black text-black hover:bg-neutral-100'}`}><Home size={18} /></a>
+          <Link href="/" className={`p-1.5 border-2 transition-colors ${darkMode ? 'border-neutral-700 text-white hover:bg-neutral-800' : 'border-black text-black hover:bg-neutral-100'}`}><Home size={18} /></Link>
           <img src="/logo-1.png" alt="Logo" className="h-8 w-auto cursor-pointer" onClick={() => window.location.href = "/"} />
         </div>
         <button onClick={() => setDarkMode(!darkMode)} className={`transition-colors ${darkMode ? 'text-neutral-400 hover:text-white' : 'text-neutral-500 hover:text-black'}`}>

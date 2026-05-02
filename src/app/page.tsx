@@ -1,17 +1,19 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase-client";
 import { 
-  MapPin, ArrowUpRight, Calendar, Disc, Map as MapIcon, 
-  X, Star, Zap, Instagram, ChevronLeft, ChevronRight,
+  Calendar, Disc, Map as MapIcon, 
+  X, Zap, Instagram, ChevronLeft, ChevronRight,
   Sun, Moon, Plus, Users 
 } from "lucide-react";
 import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
 import Link from "next/link";
 
-// --- Types ---
 export interface AfterFiveEvent {
   id?: string | number;
   event_date: string;
@@ -22,7 +24,7 @@ export interface AfterFiveEvent {
   dj_names: string[];
   image_url?: string;
   ig_post_url?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface MarkerData {
@@ -33,34 +35,6 @@ export interface MarkerData {
   status: string;
 }
 
-// --- Config & Theme ---
-const THEME = {
-  dark: {
-    bgPrimary: "#0B0B0D",
-    bgSecondary: "#151518",
-    surface: "#1C1C20",
-    primaryAccent: "#F53D04",
-    accentHover: "#FF4D1A",
-    textPrimary: "#FFFFFF",
-    textSecondary: "#B3B3B8",
-    border: "#2A2A2E",
-    inputBg: "#121214"
-  },
-  light: {
-    bgPrimary: "#FFFFFF",
-    bgSecondary: "#F7F7F9",
-    surface: "#FFFFFF",
-    primaryAccent: "#F53D04",
-    accentHover: "#D93600",
-    accentSoft: "#FFE5DE",
-    textPrimary: "#111111",
-    textSecondary: "#55555A",
-    border: "#E5E5EA",
-    inputBg: "#F2F2F5"
-  }
-};
-
-// Tab transition variants
 const TAB_VARIANTS = {
   initial: { opacity: 0, y: 10 },
   animate: { opacity: 1, y: 0 },
@@ -157,13 +131,13 @@ export default function AfterFivePop() {
         const grouped = data.reduce<AfterFiveEvent[]>((acc, current) => {
           if (!current.event_date) return acc;
 
-          let rawDjs = current.djs || current.dj_name || "";
+          const rawDjs = current.djs || current.dj_name || "";
           let currentDjs: string[] = [];
 
           if (Array.isArray(rawDjs)) {
              currentDjs = rawDjs;
           } else if (typeof rawDjs === 'string') {
-             let cleanStr = rawDjs.replace(/""/g, '"');
+             const cleanStr = rawDjs.replace(/""/g, '"');
              if (cleanStr.trim().startsWith('[')) {
                 try { currentDjs = JSON.parse(cleanStr); } 
                 catch { currentDjs = cleanStr.split(','); }
@@ -317,7 +291,6 @@ export default function AfterFivePop() {
         }
       `}} />
 
-      {/* --- Splash Screen --- */}
       <AnimatePresence>
         {showSplash && (
           <motion.div 
@@ -339,7 +312,6 @@ export default function AfterFivePop() {
         )}
       </AnimatePresence>
       
-      {/* --- Beta Modal --- */}
       <AnimatePresence>
   {showBetaModal && (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -379,7 +351,6 @@ export default function AfterFivePop() {
   )}
 </AnimatePresence>
 
-      {/* --- Desktop Sidebar --- */}
       <nav className={`hidden md:flex flex-col w-[300px] h-full border-r z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
         <div className={`h-[180px] border-b flex flex-col items-center justify-center p-6 text-center relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}>
            <div className={`absolute inset-0 opacity-10 ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
@@ -419,7 +390,6 @@ export default function AfterFivePop() {
       </nav>
 
       <main className="flex-1 w-full h-full relative overflow-hidden flex flex-col">
-        {/* Mobile Header */}
         <div className={`md:hidden h-[60px] w-full border-b flex items-center justify-between px-4 z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
            <img src="/logo-1.png" alt="AfterFive Logo" className="h-6 w-auto" onClick={() => setView("LIVE")} />
            <div className="flex items-center gap-4">
@@ -454,7 +424,6 @@ export default function AfterFivePop() {
         </div>
       </main>
 
-      {/* --- Mobile Nav --- */}
       <div className={`mobile-nav-safe md:hidden fixed bottom-0 left-0 w-full border-t z-50 flex items-stretch ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
          <MobileNavBtn icon={<Zap size={18} />} active={view === "LIVE"} onClick={() => setView("LIVE")} color="#F53D04" darkMode={darkMode} />
          <div className={`w-[1px] h-full ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
@@ -471,8 +440,6 @@ export default function AfterFivePop() {
     </div>
   );
 }
-
-// --- 1. Gallery View (Live) ---
 
 interface ViewProps {
   events: AfterFiveEvent[];
@@ -572,7 +539,6 @@ function GalleryView({ events, todayEvents, darkMode }: GalleryViewProps) {
              </div>
              
              <div className={`p-4 md:p-6 overflow-y-auto flex-1 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 min-h-0 ${darkMode ? 'bg-[#151518]' : 'bg-[#F7F7F9]'}`}>
-                {/* Group 1: Venue, Title, DJs */}
                 <div className="flex flex-col min-w-0 w-full md:flex-1">
                   <h3 className="font-black text-lg md:text-3xl uppercase text-[#F53D04] mb-1 line-clamp-1 drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">
                     {activeEvent.club_name}
@@ -599,7 +565,6 @@ function GalleryView({ events, todayEvents, darkMode }: GalleryViewProps) {
                   </div>
                 </div>
 
-                {/* Group 2: Instagram Button */}
                 <div className="shrink-0 w-full md:w-auto mt-1 md:mt-0 flex items-center justify-center">
                   <a href={activeEvent.ig_post_url} target="_blank" rel="noreferrer" className={`w-full md:w-auto px-4 py-3 md:px-5 md:py-4 font-black uppercase tracking-widest text-[10px] md:text-xs transition-colors shadow-[0_0_15px_rgba(245,61,4,0.4)] inline-flex items-center justify-center gap-2 text-center ${darkMode ? 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#FF4D1A] hover:shadow-[0_0_25px_rgba(245,61,4,0.6)]' : 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#D93600]'}`}>
                      <Instagram size={18} /> <span>View on Instagram</span>
@@ -683,7 +648,6 @@ function TodayOverview({
                     )}
                   </div>
 
-                  {/* Hover Info Panel - Hidden on Mobile */}
                   <div className="hidden md:block absolute inset-x-0 bottom-0 p-2 md:p-3 pointer-events-none overflow-hidden">
                     <div className={`overview-tile-panel border px-3 py-3 md:px-4 md:py-4 overflow-y-auto pointer-events-auto max-h-[42%] md:max-h-[46%] ${darkMode ? 'bg-[#0B0B0D]/88 border-[#2A2A2E]' : 'bg-[#FFFFFF]/92 border-[#E5E5EA]'} backdrop-blur-sm`}>
                       <div className="flex items-start justify-between gap-2">
@@ -729,8 +693,6 @@ function TodayOverview({
   );
 }
 
-// --- 2. Block List View (Agenda) ---
-
 interface BlockListViewProps extends ViewProps {
   title: string;
 }
@@ -757,7 +719,7 @@ function BlockListView({ title, events, darkMode }: BlockListViewProps) {
        </div>
 
         <div className="flex flex-col relative z-10">
-          {sortedDates.map((date, dateIndex) => {
+          {sortedDates.map((date) => {
                const dateObj = new Date(date);
                const isWeekend = dateObj.getDay() === 5 || dateObj.getDay() === 6;
 
@@ -793,7 +755,7 @@ function BlockListView({ title, events, darkMode }: BlockListViewProps) {
                           <a key={i} href={e.ig_post_url} target="_blank" rel="noreferrer" className={`group relative border-r flex flex-col h-full overflow-hidden hover:z-20 ${darkMode ? 'border-[#2A2A2E] bg-[#1C1C20]' : 'border-[#E5E5EA] bg-[#FFFFFF]'}`}>
                              <div className={`w-full aspect-square border-b flex items-center justify-center overflow-hidden ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
                                 {e.image_url ? (
-                                  <img src={e.image_url} className="w-full h-full object-contain group-hover:scale-105 transition-all duration-300" />
+                                  <img src={e.image_url} alt={e.event_name || e.club_name || "Event poster"} className="w-full h-full object-contain group-hover:scale-105 transition-all duration-300" />
                                 ) : (
                                   <div className={`font-black text-xl ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>NO IMG</div>
                                 )}
@@ -829,8 +791,6 @@ function BlockListView({ title, events, darkMode }: BlockListViewProps) {
   );
 }
 
-// --- 3. Archive View ---
-
 function ArchiveCalendarView({ events, darkMode }: ViewProps) {
   const grouped = events.reduce<Record<string, AfterFiveEvent[]>>((acc, event) => {
     if (!event.event_date) return acc;
@@ -858,7 +818,7 @@ function ArchiveCalendarView({ events, darkMode }: ViewProps) {
               {monthEvents.map((e, i) => (
                 <a key={i} href={e.ig_post_url} target="_blank" rel="noreferrer" className={`group relative aspect-square overflow-hidden block border ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
                   {e.image_url ? (
-                    <img src={e.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <img src={e.image_url} alt={e.event_name || e.club_name || "Archived event poster"} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
                     <div className={`w-full h-full flex items-center justify-center font-black text-sm ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>NO IMG</div>
                   )}
@@ -885,8 +845,6 @@ function ArchiveCalendarView({ events, darkMode }: ViewProps) {
     </motion.div>
   );
 }
-
-// --- 4. Map View ---
 
 interface MapViewProps {
   isLoaded: boolean;
@@ -919,8 +877,6 @@ function MapView({ isLoaded, darkMode }: MapViewProps) {
   );
 }
 
-// --- Utilities ---
-
 interface SidebarLinkProps {
   label: string;
   sub: string;
@@ -935,7 +891,6 @@ interface SidebarLinkProps {
 
 function SidebarLink({ label, sub, active, onClick, href, color, icon, darkMode, highlight = false }: SidebarLinkProps) {
   
-  // tweak bg if it's a highlighted link
   const baseBg = highlight 
     ? (darkMode ? 'bg-[#10B981]/10 text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#10B981]/20' : 'bg-[#10B981]/10 text-[#111111] border-[#E5E5EA] hover:bg-[#10B981]/20')
     : (darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#1C1C20]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#FFFFFF]');
@@ -983,7 +938,6 @@ interface MobileNavBtnProps {
 function MobileNavBtn({ icon, active, onClick, href, color, darkMode, highlight = false }: MobileNavBtnProps) {
   const activeBg = darkMode ? 'bg-[#1C1C20] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#111111]';
   
-  // different styling for highlighted tabs on mobile
   const baseBg = highlight 
     ? (darkMode ? 'bg-[#10B981]/20 text-[#10B981]' : 'bg-[#10B981]/15 text-[#059669]')
     : (darkMode ? 'bg-[#151518] text-[#6E6E73]' : 'bg-[#F7F7F9] text-[#8C8C92]');

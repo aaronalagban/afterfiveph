@@ -23,34 +23,18 @@ function assertRequiredEnv() {
 
 assertRequiredEnv();
 
-/* ---------------------------
-  SUPABASE
---------------------------- */
-
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-/* ---------------------------
-  APIFY
---------------------------- */
-
 const apifyClient = new ApifyClient({
   token: process.env.APIFY_API_TOKEN
 });
 
-/* ---------------------------
-  GEMINI
---------------------------- */
-
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 const GEMINI_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-
-/* ---------------------------
-  TARGET CLUBS
---------------------------- */
 
 const TARGET_ACCOUNTS = [
   "annexhousemanila",
@@ -61,24 +45,12 @@ const TARGET_ACCOUNTS = [
   "uglyduckpoblacion"
 ];
 
-/* ---------------------------
-  SOURCE PRIORITY MAP
-  dedicated_poster = best: a flyer made specifically for one event on one night
-  weekly_overview  = medium: a schedule card showing multiple nights
-  artist_promo     = low: an individual DJ/artist's personal promo, not venue-specific
-  not_event        = discard
---------------------------- */
-
 const PRIORITY = {
   dedicated_poster: 10,
   weekly_overview: 2,
   artist_promo: 1,
   not_event: 0
 };
-
-/* ---------------------------
-  UPLOAD IMAGE
---------------------------- */
 
 async function hostImage(buffer, username) {
   const fileName = `flyer-${username}-${Date.now()}.jpg`;
@@ -98,28 +70,17 @@ async function hostImage(buffer, username) {
   return publicUrl;
 }
 
-/* ---------------------------
-  DATE FILTER
-  FIX: original code mutated `today` via setDate(), causing bugs on repeated calls.
-  Now we clone the date before mutating.
---------------------------- */
-
 function isFromThisWeek(dateString) {
   const postDate = new Date(dateString);
   const now = new Date();
   const dayOfWeek = now.getDay(); // 0 = Sunday
 
-  const lastSunday = new Date(now); // clone before mutating
+  const lastSunday = new Date(now);
   lastSunday.setDate(now.getDate() - dayOfWeek);
   lastSunday.setHours(0, 0, 0, 0);
 
   return postDate >= lastSunday;
 }
-
-/* ---------------------------
-  CAPTION SCORING
-  Used as a cheap pre-filter before spending API calls on Gemini.
---------------------------- */
 
 function captionScore(caption) {
   if (!caption) return 0;
@@ -140,10 +101,6 @@ function captionScore(caption) {
   return score;
 }
 
-/* ---------------------------
-  OCR & AI HELPERS
---------------------------- */
-
 async function extractText(buffer) {
   try {
     const { data: { text } } = await Tesseract.recognize(buffer, "eng", { logger: () => {} });
@@ -162,15 +119,10 @@ function looksLikePoster(text) {
   return keywords.some(k => text.includes(k));
 }
 
-/* ---------------------------
-  SAFE JSON PARSE
-  FIX: added debug logging so malformed Gemini responses aren't silently dropped.
---------------------------- */
-
 function safeJSON(text) {
   try {
     return JSON.parse(text);
-  } catch (e) {
+  } catch {
     console.debug("⚠️  JSON parse failed. Raw snippet:", text.slice(0, 150));
     return null;
   }
@@ -193,12 +145,6 @@ function describeGeminiFailure(aiResponse, aiData) {
   return `HTTP ${aiResponse.status}: response did not include text`;
 }
 
-/* ---------------------------
-  NORMALIZE DJs
-  FIX: previously djs field was inconsistently a string or array with fragile fallbacks.
-  This normalizes any shape Gemini returns into a clean string[].
---------------------------- */
-
 function normalizeDJs(raw) {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map(s => String(s).trim()).filter(Boolean);
@@ -207,10 +153,6 @@ function normalizeDJs(raw) {
   }
   return [];
 }
-
-/* ---------------------------
-  LOAD KNOWN DJs
---------------------------- */
 
 async function loadKnownDJs() {
   const { data } = await supabase.from("events").select("djs");
@@ -238,30 +180,20 @@ function detectKnownDJ(text, knownDJs) {
   return knownDJs.some(dj => text.includes(dj));
 }
 
-/* ---------------------------
-  VIDEO FRAME EXTRACTION
-  For video posts, Instagram provides a static thumbnail via displayUrl which works
-  in ~90% of cases. This fallback extracts an actual frame via ffmpeg for Reels
-  where the key info appears mid-video rather than as a cover image.
-  Requires ffmpeg installed on the system (e.g. `apt install ffmpeg`).
---------------------------- */
-
 async function getImageBufferFromPost(post) {
   const isVideo = post.type === "Video" || !!post.videoUrl;
 
-  // Always try the thumbnail first — it's fast and free
   const thumbnailUrl = post.displayUrl;
   if (thumbnailUrl) {
     try {
       const res = await fetch(thumbnailUrl);
       const buffer = Buffer.from(await res.arrayBuffer());
-      if (buffer.length > 5000) return buffer; // sanity check it's a real image
+      if (buffer.length > 5000) return buffer;
     } catch {
       console.debug("⚠️  Thumbnail fetch failed, trying video frame extraction...");
     }
   }
 
-  // Fallback: download video and extract a frame at t=2s using ffmpeg
   if (isVideo && post.videoUrl) {
     try {
       const tmpVideo = `/tmp/vid-${Date.now()}.mp4`;
@@ -270,12 +202,10 @@ async function getImageBufferFromPost(post) {
       const res = await fetch(post.videoUrl);
       fs.writeFileSync(tmpVideo, Buffer.from(await res.arrayBuffer()));
 
-      // t=2 usually captures title cards or poster text in Reels
       execSync(`ffmpeg -ss 2 -i ${tmpVideo} -frames:v 1 ${tmpFrame} -y -loglevel error`);
 
       const buffer = fs.readFileSync(tmpFrame);
 
-      // Cleanup temp files
       fs.unlinkSync(tmpVideo);
       fs.unlinkSync(tmpFrame);
 
@@ -287,10 +217,6 @@ async function getImageBufferFromPost(post) {
 
   return null;
 }
-
-/* ---------------------------
-  INSERT EVENT (Database)
---------------------------- */
 
 async function insertEvent(event) {
   const { data: existingRecords, error: lookupError } = await supabase
@@ -333,14 +259,6 @@ async function insertEvent(event) {
     }
   }
 }
-
-/* ---------------------------
-  GEMINI IMAGE CLASSIFIER
-  FIX: Instead of counting dates to guess poster type (brittle), we now ask Gemini
-  to explicitly classify the image_type. This prevents artist promo posts from
-  being treated as dedicated posters, and ensures weekly overviews don't beat
-  dedicated posters found later in the same carousel.
---------------------------- */
 
 async function classifyImage(buffer, todayString) {
   const prompt = `
@@ -409,10 +327,6 @@ async function classifyImage(buffer, todayString) {
 
   return safeJSON(raw);
 }
-
-/* ---------------------------
-  SCRAPER
---------------------------- */
 
 async function run() {
   console.log("🚀 AfterFive Scraper Starting");

@@ -5,7 +5,6 @@ import Tesseract from "tesseract.js";
 
 dotenv.config({ path: ".env.local" });
 
-// Get the club handle from the command line arguments
 const TARGET_CLUB = process.argv[2];
 
 if (!TARGET_CLUB) {
@@ -13,10 +12,6 @@ if (!TARGET_CLUB) {
   console.error("👉 Example: node scrape-single.js uglyduckpoblacion");
   process.exit(1);
 }
-
-/* ---------------------------
-SUPABASE, APIFY, GEMINI
---------------------------- */
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -29,10 +24,6 @@ const apifyClient = new ApifyClient({
 
 const GEMINI_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
-
-/* ---------------------------
-UPLOAD IMAGE
---------------------------- */
 
 async function hostImage(buffer, username) {
   const fileName = `flyer-${username}-${Date.now()}.jpg`;
@@ -47,33 +38,23 @@ async function hostImage(buffer, username) {
   return publicUrl;
 }
 
-/* ---------------------------
-2-WEEK DATE FILTER
---------------------------- */
-
 function isFromLastTwoWeeks(dateValue) {
   if (!dateValue) return true;
 
   let postDate = new Date(dateValue);
 
-  // Handle Unix timestamps
   if (typeof dateValue === 'number' && dateValue < 10000000000) {
     postDate = new Date(dateValue * 1000);
   }
 
   if (isNaN(postDate.getTime())) return true;
 
-  // Look back exactly 14 days
   const today = new Date();
   const cutoffDate = new Date(today.getTime() - (14 * 24 * 60 * 60 * 1000));
   cutoffDate.setHours(0, 0, 0, 0);
 
   return postDate >= cutoffDate;
 }
-
-/* ---------------------------
-HELPERS & AI
---------------------------- */
 
 function captionScore(caption) {
   if (!caption) return 0;
@@ -168,10 +149,6 @@ async function insertEvent(event) {
   }
 }
 
-/* ---------------------------
-MAIN SCRAPER
---------------------------- */
-
 async function run() {
   console.log(`🚀 Starting Single-Scrape for: @${TARGET_CLUB} (Looking 2 weeks back)`);
   const todayString = new Date().toISOString().split("T")[0];
@@ -180,7 +157,6 @@ async function run() {
     const knownDJs = await loadKnownDJs();
     console.log(`🎧 Loaded ${knownDJs.length} known DJs`);
 
-    // We increase limit slightly to 20 to make sure we hit 2 weeks of posts for active clubs
     const apifyRun = await apifyClient.actor("apify/instagram-profile-scraper").call({
       usernames: [TARGET_CLUB],
       resultsType: "posts",
@@ -280,9 +256,8 @@ async function run() {
 
           const uniqueDatesCount = new Set(results.map(r => r.event_date)).size;
           const sourcePriority = uniqueDatesCount >= 3 ? 2 : 10;
-          const posterType = sourcePriority === 10 ? "Dedicated Poster" : "Weekly Overview";
-          
-          console.log(`   ➔ Found ${uniqueDatesCount} date(s) in Image ${i + 1} [Type: ${posterType}]`);
+
+          console.log(`   ➔ Found ${uniqueDatesCount} date(s) in Image ${i + 1}`);
 
           for (const result of results) {
             const eventDate = result.event_date || todayString;
@@ -307,7 +282,7 @@ async function run() {
               event_name: winningEvent.event_name || "Special Event",
               dj_name: djNameString,
               club_name: TARGET_CLUB,
-              city: "Makati", // You can change this if needed
+              city: "Makati",
               event_date: winningEvent.eventDate,
               image_url: hostedUrl,
               ig_post_url: `${post.url}#${winningEvent.eventDate}`, 

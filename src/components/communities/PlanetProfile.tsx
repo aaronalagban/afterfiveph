@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+/* eslint-disable @next/next/no-img-element */
+
+import { useState, useRef } from "react";
 import { motion, Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Play, Info } from "lucide-react";
 
-// --- ANIMATION VARIANTS ---
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 40 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } }
@@ -28,7 +29,6 @@ const imageReveal: Variants = {
   }
 };
 
-// --- DESIGN TOKENS ---
 const BEIGE = "bg-[#EAE6DF]";
 const RED_TEXT = "text-[#E6291C]";
 const RED_BG = "bg-[#E6291C]";
@@ -40,7 +40,6 @@ export default function PlanetProfile() {
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Smooth Exit Handler
   const handleBack = () => {
     setIsExiting(true); 
     setTimeout(() => {
@@ -48,19 +47,17 @@ export default function PlanetProfile() {
     }, 400); 
   };
 
-  // Scroll visibility for Navbar
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setIsScrolled(e.currentTarget.scrollTop > 80);
   };
 
-  // Custom Smooth Scroll for Anchor Links
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
     e.preventDefault();
     const element = document.getElementById(id);
     if (element && scrollContainerRef.current) {
       const topPos = element.offsetTop;
       scrollContainerRef.current.scrollTo({
-        top: topPos - 55, // Account for sticky navbar height
+        top: topPos - 55,
         behavior: 'smooth'
       });
     }
@@ -81,7 +78,6 @@ export default function PlanetProfile() {
         transition={{ duration: 0.8, delay: 0.2 }}
         className="w-full relative z-10"
       >
-        {/* 1. ANIMATED STICKY TOP NAV */}
         <motion.nav 
           initial={{ y: "-100%" }}
           animate={{ y: isScrolled ? "0%" : "-100%" }}
@@ -106,14 +102,12 @@ export default function PlanetProfile() {
 
         <main className="w-full">
           
-          {/* 2. FULLSCREEN HERO SECTION */}
           <div className={`grid grid-cols-1 md:grid-cols-2 border-b ${RED_BORDER} h-screen`}>
             <motion.div 
               initial="hidden" animate="visible" variants={staggerContainer}
               className={`p-6 md:p-12 md:border-r ${RED_BORDER} flex flex-col justify-between h-[50vh] md:h-full`}
             >
               <div className="flex justify-between items-start w-full">
-                {/* Fallback back button inside Hero when nav is hidden */}
                 <button onClick={handleBack} className="flex items-center gap-2 hover:opacity-50 transition-opacity uppercase font-mono text-[9px] md:text-[10px] tracking-widest">
                   <ArrowLeft size={14} /> Directory
                 </button>
@@ -132,7 +126,6 @@ export default function PlanetProfile() {
               </div>
             </motion.div>
 
-            {/* Full Bleed Colored Image Container */}
             <div className="relative h-[50vh] md:h-full w-full overflow-hidden bg-black/5">
               <motion.div 
                 initial="hidden" animate="visible" variants={imageReveal}
@@ -141,7 +134,7 @@ export default function PlanetProfile() {
                 <img 
                   src="https://aqhavvixrywiuzjraxfy.supabase.co/storage/v1/object/public/collective-hero/planet.webp" 
                   alt="Planet Hero" 
-                  className="w-full h-full object-cover" // Removed grayscale classes
+                  className="w-full h-full object-cover"
                 />
               </motion.div>
               <span className="absolute bottom-4 right-6 font-mono text-[8px] uppercase tracking-widest text-white mix-blend-difference z-10">
@@ -150,7 +143,6 @@ export default function PlanetProfile() {
             </div>
           </div>
 
-          {/* 3. OVERVIEW */}
           <div id="overview" className={`grid grid-cols-1 md:grid-cols-2 border-b ${RED_BORDER}`}>
             <div className={`relative aspect-square md:aspect-auto md:border-r ${RED_BORDER} overflow-hidden`}>
               <motion.div 
@@ -176,14 +168,13 @@ export default function PlanetProfile() {
                   Planet is an ecosystem built for the nocturnal. We disregard traditional club boundaries in favor of raw, industrial experiences.
                 </p>
                 <p>
-                  Founded in 2023, the collective merges brutalist visual arts with forward-thinking electronic music, serving as a sanctuary for Manila's underground.
+                  Founded in 2023, the collective merges brutalist visual arts with forward-thinking electronic music, serving as a sanctuary for Manila&apos;s underground.
                 </p>
               </div>
               <span className="font-mono text-[9px] uppercase tracking-widest mt-12 block">Est. 2023</span>
             </motion.div>
           </div>
 
-          {/* 4. WHAT THEY STAND FOR (STORYTELLING) */}
           <div className={`p-6 md:p-12 border-b ${RED_BORDER}`}>
             <motion.h2 
               initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
@@ -215,7 +206,7 @@ export default function PlanetProfile() {
                   transition={{ delay: i * 0.15, duration: 0.6 }}
                 >
                   <span className="font-mono text-[10px] uppercase tracking-widest mb-6 block border-b border-[#E6291C]/30 pb-2">
-                    0{i + 1} // {item.title}
+                    0{i + 1}{" // "}{item.title}
                   </span>
                   <p>{item.desc}</p>
                 </motion.div>
@@ -223,7 +214,6 @@ export default function PlanetProfile() {
             </div>
           </div>
 
-          {/* 5. THE WORLD THEY CREATE (Netflix Style Video Embeds) */}
           <div id="world" className="bg-[#0a0a0a] border-b border-[#E6291C]">
             <div className="p-6 md:p-12 pb-6 flex flex-col md:flex-row md:justify-between md:items-end">
               <div>
@@ -236,7 +226,6 @@ export default function PlanetProfile() {
               </div>
             </div>
 
-            {/* Featured Video Player */}
             <div className="w-full aspect-video relative group bg-black">
               <iframe 
                 src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=0&mute=0&controls=1&rel=0&modestbranding=1" 
@@ -246,7 +235,6 @@ export default function PlanetProfile() {
               />
             </div>
 
-            {/* "Episodes" / More Sets Strip */}
             <div className="grid grid-cols-2 md:grid-cols-4 border-t border-white/10 divide-x divide-white/10">
               {[
                 "https://www.youtube.com/embed/5qap5aO4i9A?controls=0&rel=0&modestbranding=1",
@@ -280,7 +268,6 @@ export default function PlanetProfile() {
             </div>
           </div>
 
-          {/* 6. WORK / EVENTS */}
           <div id="work" className={`border-b ${RED_BORDER}`}>
             <div className={`p-6 md:p-12 border-b ${RED_BORDER}`}>
               <h2 className="font-black text-4xl md:text-6xl uppercase tracking-tighter">Work / Events</h2>
@@ -317,7 +304,6 @@ export default function PlanetProfile() {
             </div>
           </div>
 
-          {/* 7. MEMBERS */}
           <div id="members" className={`p-6 md:p-12 border-b ${RED_BORDER}`}>
             <div className="flex justify-between items-end mb-12 md:mb-16">
               <h2 className="font-black text-4xl md:text-6xl uppercase tracking-tighter">Members</h2>
@@ -350,7 +336,6 @@ export default function PlanetProfile() {
             </div>
           </div>
 
-          {/* 8. CONNECT (FOOTER) */}
           <div className="grid grid-cols-1 md:grid-cols-2 min-h-[40vh]">
             <div className={`p-6 md:p-12 md:border-r ${RED_BORDER} flex flex-col justify-center`}>
               <h2 className="font-black text-6xl md:text-8xl uppercase tracking-tighter leading-[0.85]">

@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,7 +19,7 @@ export interface CommunityDirectoryItem {
   cover_image_url?: string;
 }
 
-const ACCESS_PASSWORD = "MANILA";
+const ACCESS_PASSWORD = process.env.NEXT_PUBLIC_COMMUNITIES_PASSWORD || "MANILA";
 
 // --- INTERACTIVE 3D WAVE CANVAS ---
 const InteractiveWavyGrid = ({ darkMode }: { darkMode: boolean }) => {
@@ -34,7 +36,7 @@ const InteractiveWavyGrid = ({ darkMode }: { darkMode: boolean }) => {
     let width = window.innerWidth;
     let height = window.innerHeight;
 
-    let mouse = { x: -1000, y: -1000 };
+    const mouse = { x: -1000, y: -1000 };
     const handleMouseMove = (e: MouseEvent) => {
       mouse.x = e.clientX;
       mouse.y = e.clientY;

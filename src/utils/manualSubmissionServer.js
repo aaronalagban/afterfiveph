@@ -24,7 +24,6 @@ export async function approveAndScrapeEvent(pendingEventId) {
   const supabase = getAdminClient();
   const apifyToken = process.env.APIFY_API_TOKEN;
 
-  // 1. Fetch the pending event data
   const { data: pendingEvent, error: fetchError } = await supabase
     .from('pending_events')
     .select('*')
@@ -35,7 +34,6 @@ export async function approveAndScrapeEvent(pendingEventId) {
 
   console.log(`🔍 Scraping IG Post: ${pendingEvent.ig_post_url}`);
 
-  // 2. Direct REST API Call to Apify 
   const apifyRes = await fetch(
     `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${apifyToken}`,
     {
@@ -59,31 +57,26 @@ export async function approveAndScrapeEvent(pendingEventId) {
 
   const postData = items[0];
 
-  // --- Extract img_index from URL ---
-  let targetIndex = 0; // Default to the first image
+  let targetIndex = 0;
   try {
     const urlObj = new URL(pendingEvent.ig_post_url);
     const imgIndexParam = urlObj.searchParams.get("img_index");
     
     if (imgIndexParam) {
       const parsedIndex = parseInt(imgIndexParam, 10);
-      // IG's img_index is 1-based (e.g., img_index=2 is the second image)
       if (!isNaN(parsedIndex) && parsedIndex > 0) {
-        targetIndex = parsedIndex - 1; // Convert to 0-based array index
+        targetIndex = parsedIndex - 1;
       }
     }
-  } catch (err) {
+  } catch {
     console.warn("Could not parse IG URL, defaulting to first image.");
   }
 
-  // --- Select the correct image based on the index ---
   let rawImageUrl;
   if (postData.childPosts && postData.childPosts.length > 0) {
-    // Make sure the index isn't out of bounds, otherwise fallback to index 0
     const safeIndex = targetIndex < postData.childPosts.length ? targetIndex : 0;
     rawImageUrl = postData.childPosts[safeIndex]?.displayUrl;
   } else {
-    // If it's a single image post (not a carousel), just use the main display URL
     rawImageUrl = postData.displayUrl;
   }
 
@@ -91,14 +84,12 @@ export async function approveAndScrapeEvent(pendingEventId) {
 
   console.log(`📥 Downloading image (Index: ${targetIndex})...`);
 
-  // 3. Download and Upload Image
   const imgRes = await fetch(rawImageUrl);
   const buffer = Buffer.from(await imgRes.arrayBuffer());
   
   console.log("☁️ Uploading to Supabase...");
   const finalImageUrl = await hostImage(supabase, buffer, pendingEvent.club_name);
 
-  // 4. Insert into LIVE events table
   const djNameForDisplay = pendingEvent.djs && pendingEvent.djs.length > 0 
     ? pendingEvent.djs.join(", ") 
     : "Various Artists";
@@ -118,7 +109,6 @@ export async function approveAndScrapeEvent(pendingEventId) {
 
   if (insertError) throw new Error(`Live DB Insert Error: ${insertError.message}`);
 
-  // 5. Mark pending as approved
   await supabase.from('pending_events').update({ status: 'approved' }).eq('id', pendingEventId);
 
   return { success: true };
