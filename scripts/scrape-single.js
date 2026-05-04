@@ -146,8 +146,7 @@ async function insertEvent(event) {
     const { error } = await supabase.from("events").insert(event);
     if (error) console.log("❌ DB Insert FAILED:", error);
     else console.log(`📡 DB Insert SUCCESS for ${event.event_date}`);
-  }
-}
+  }}
 
 async function run() {
   console.log(`🚀 Starting Single-Scrape for: @${TARGET_CLUB} (Looking 2 weeks back)`);
