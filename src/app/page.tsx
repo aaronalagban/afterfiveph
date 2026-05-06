@@ -6,10 +6,10 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { supabase } from "@/lib/supabase-client";
-import { 
-  Calendar, Disc, Map as MapIcon, 
+import {
+  Calendar, Disc, Map as MapIcon,
   X, Zap, Instagram, ChevronLeft, ChevronRight,
-  Sun, Moon, Plus, Users 
+  Sun, Moon, Plus, Users, Info
 } from "lucide-react";
 import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
 import Link from "next/link";
@@ -90,6 +90,7 @@ export default function AfterFivePop() {
   const [showBetaModal, setShowBetaModal] = useState(false);
   const [view, setView] = useState<"LIVE" | "AGENDA" | "MAP" | "ARCHIVE">("LIVE");
   const [darkMode, setDarkMode] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
   
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded: isMapLoaded } = useLoadScript({ googleMapsApiKey: googleMapsKey || "" });
@@ -279,26 +280,6 @@ export default function AfterFivePop() {
           100% { transform: translateX(-50%); }
         }
 
-        .overview-tile-panel {
-          transform: translateY(0);
-          opacity: 1;
-          transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 280ms cubic-bezier(0.22, 1, 0.36, 1);
-          will-change: transform, opacity;
-        }
-
-        @media (min-width: 768px) {
-          .overview-tile-panel {
-            transform: translateY(calc(100% - 68px));
-            opacity: 0.96;
-          }
-
-          .overview-tile:hover .overview-tile-panel,
-          .overview-tile:focus-within .overview-tile-panel {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-
         @media (max-width: 767px) {
           .mobile-safe-bottom {
             padding-bottom: calc(3rem + env(safe-area-inset-bottom, 0px));
@@ -308,6 +289,11 @@ export default function AfterFivePop() {
             height: calc(3rem + env(safe-area-inset-bottom, 0px));
             padding-bottom: env(safe-area-inset-bottom, 0px);
           }
+        }
+
+        .tap-hint { display: none; }
+        @media (hover: none) and (pointer: coarse) {
+          .tap-hint { display: flex; }
         }
       `}} />
 
@@ -335,17 +321,17 @@ export default function AfterFivePop() {
       <AnimatePresence>
         {showBetaModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} 
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className={`border p-8 max-w-sm w-full text-center shadow-[0_0_40px_rgba(245,61,4,0.2)] ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]'}`}
+              className={`border p-8 max-w-sm w-full text-center ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]'}`}
             >
               <h2 className="font-black text-3xl uppercase mb-4">WIP / BETA</h2>
               
               <p className={`font-mono text-sm mb-6 leading-relaxed ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>
                 AfterFive is currently a work in progress. If you have any suggestions or find bugs, feel free to slide into my DMs:
-                <a href="https://instagram.com/aaronalagbann" target="_blank" rel="noreferrer" className="text-[#F53D04] font-bold block mt-2 hover:underline drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">@aaronalagbann</a>
+                <a href="https://instagram.com/aaronalagbann" target="_blank" rel="noreferrer" className="text-[#F53D04] font-bold block mt-2 hover:underline">@aaronalagbann</a>
                 <span className={`block mt-4 text-xs ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>Some events may not appear yet due to current automation limits.</span>
               </p>
 
@@ -359,9 +345,9 @@ export default function AfterFivePop() {
                   Submit an Event
                 </a>
 
-                <button 
+                <button
                   onClick={() => setShowBetaModal(false)}
-                  className={`w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#F53D04] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.4)]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#F53D04] hover:text-[#FFFFFF] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.3)]'}`}
+                  className={`w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#F53D04] hover:border-[#F53D04]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#F53D04] hover:text-[#FFFFFF] hover:border-[#F53D04]'}`}
                 >
                   Aight
                 </button>
@@ -396,31 +382,44 @@ export default function AfterFivePop() {
         </div>
 
         <div className={`p-4 flex justify-between items-center border-t font-mono text-[10px] uppercase tracking-wider ${darkMode ? 'bg-[#151518] border-[#2A2A2E] text-[#B3B3B8]' : 'bg-[#F7F7F9] border-[#E5E5EA] text-[#55555A]'}`}>
-          <a href="/submit" className={`hover:text-[#F53D04] transition-all flex items-center gap-1 group ${darkMode ? 'hover:drop-shadow-[0_0_8px_rgba(245,61,4,0.6)]' : ''}`}>
+          <a href="/submit" className="hover:text-[#F53D04] transition-colors flex items-center gap-1 group">
             <Plus size={12} className="group-hover:rotate-90 transition-transform" /> Submit Event
           </a>
-          <button onClick={() => setDarkMode(!darkMode)} className={`hover:text-[#F53D04] transition-all flex items-center gap-1 ${darkMode ? 'hover:drop-shadow-[0_0_8px_rgba(245,61,4,0.6)]' : ''}`}>
-            {darkMode ? <Sun size={12} /> : <Moon size={12} />} Theme
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowInfo(true)} className="hover:text-[#F53D04] transition-colors flex items-center gap-1">
+              <Info size={12} /> Info
+            </button>
+            <button onClick={() => setDarkMode(!darkMode)} className="hover:text-[#F53D04] transition-colors flex items-center gap-1">
+              {darkMode ? <Sun size={12} /> : <Moon size={12} />} Theme
+            </button>
+          </div>
         </div>
         
-        <div className={`p-4 border-t ${darkMode ? 'bg-[#0B0B0D] border-[#2A2A2E] text-[#6E6E73]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#8C8C92]'}`}>
-          <Marquee text="MANILA AFTER DARK • DRINK RESPONSIBLY • " />
-        </div>
       </nav>
 
       <main className="flex-1 w-full h-full relative overflow-hidden flex flex-col">
-        <div className={`md:hidden h-[60px] w-full border-b flex items-center justify-between px-4 z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
-           <img src="/logo-1.png" alt="AfterFive Logo" className="h-6 w-auto" onClick={() => setView("LIVE")} />
-           <div className="flex items-center gap-4">
-             <a href="/submit" className={`text-[9px] font-mono uppercase tracking-wider flex items-center gap-0.5 ${darkMode ? 'text-[#B3B3B8] hover:text-[#FFFFFF]' : 'text-[#55555A] hover:text-[#111111]'}`}>
-               <Plus size={10} /> Submit
-             </a>
-             <button onClick={() => setDarkMode(!darkMode)} className={`transition-colors ${darkMode ? 'text-[#B3B3B8] hover:text-[#FFFFFF]' : 'text-[#55555A] hover:text-[#111111]'}`}>
-               {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-             </button>
-             <div className="bg-[#F53D04] text-[#FFFFFF] px-2 py-0.5 text-[10px] font-bold font-mono border border-transparent shadow-[0_0_10px_rgba(245,61,4,0.3)]">BETA</div>
-           </div>
+        <div className={`md:hidden h-12 w-full border-b flex items-center justify-between px-4 z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+          <img src="/logo-1.png" alt="AfterFive Logo" className="h-5 w-auto cursor-pointer" onClick={() => setView("LIVE")} />
+          <div className="flex items-center gap-2">
+            <a
+              href="/submit"
+              className={`font-black text-[9px] uppercase tracking-widest border px-2.5 py-1 transition-colors flex items-center gap-1 ${darkMode ? 'border-[#2A2A2E] text-[#B3B3B8] hover:border-[#F53D04] hover:text-[#F53D04]' : 'border-[#E5E5EA] text-[#55555A] hover:border-[#F53D04] hover:text-[#F53D04]'}`}
+            >
+              <Plus size={9} />SUBMIT
+            </a>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]'}`}
+            >
+              {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+            <button
+              onClick={() => setShowInfo(true)}
+              className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]'}`}
+            >
+              <Info size={15} />
+            </button>
+          </div>
         </div>
 
         <div className="mobile-safe-bottom flex-1 w-full relative overflow-y-auto hide-scrollbar md:pb-0">
@@ -444,6 +443,73 @@ export default function AfterFivePop() {
           </AnimatePresence>
         </div>
       </main>
+
+      {/* Info overlay */}
+      <AnimatePresence>
+        {showInfo && (
+          <motion.div
+            className="fixed inset-0 z-[150] flex items-end md:items-center justify-center md:p-8"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowInfo(false)} />
+            <motion.div
+              className={`relative w-full md:max-w-sm border overflow-hidden ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            >
+              {/* Header */}
+              <div className={`flex items-center justify-between px-5 py-3 border-b ${darkMode ? 'border-[#2A2A2E]' : 'border-[#E5E5EA]'}`}>
+                <span className={`font-mono font-bold text-[10px] uppercase tracking-[0.3em] ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>INFO</span>
+                <button
+                  onClick={() => setShowInfo(false)}
+                  className={`p-1 border transition-colors ${darkMode ? 'border-[#2A2A2E] text-[#B3B3B8] hover:border-[#F53D04] hover:text-[#F53D04]' : 'border-[#E5E5EA] text-[#55555A] hover:border-[#F53D04] hover:text-[#F53D04]'}`}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+
+              {/* Brand */}
+              <div className={`px-5 py-5 border-b ${darkMode ? 'border-[#2A2A2E]' : 'border-[#E5E5EA]'}`}>
+                <img src="/logo-1.png" alt="AfterFivePH" className="h-8 w-auto mb-3" />
+                <p className={`font-mono text-[10px] uppercase tracking-[0.25em] ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>
+                  Where Manila goes after five
+                </p>
+              </div>
+
+              {/* Legal */}
+              <div className={`px-5 py-4 border-b ${darkMode ? 'border-[#2A2A2E]' : 'border-[#E5E5EA]'}`}>
+                <p className={`font-mono text-[9px] uppercase tracking-[0.3em] mb-3 ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>Legal</p>
+                <div className="flex flex-col gap-2.5">
+                  <a
+                    href="/privacy"
+                    className={`font-black text-xs uppercase tracking-wider transition-colors flex items-center justify-between ${darkMode ? 'text-[#B3B3B8] hover:text-[#F53D04]' : 'text-[#55555A] hover:text-[#F53D04]'}`}
+                  >
+                    Privacy Policy <span className="font-mono text-[10px]">→</span>
+                  </a>
+                  <a
+                    href="/terms"
+                    className={`font-black text-xs uppercase tracking-wider transition-colors flex items-center justify-between ${darkMode ? 'text-[#B3B3B8] hover:text-[#F53D04]' : 'text-[#55555A] hover:text-[#F53D04]'}`}
+                  >
+                    Terms of Service <span className="font-mono text-[10px]">→</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-3">
+                <p className={`font-mono text-[9px] uppercase tracking-[0.2em] ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>
+                  Beta · afterfiveph.vercel.app
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className={`mobile-nav-safe md:hidden fixed bottom-0 left-0 w-full border-t z-50 flex items-stretch ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
          <MobileNavBtn icon={<Zap size={18} />} active={view === "LIVE"} onClick={() => setView("LIVE")} color="#F53D04" darkMode={darkMode} />
@@ -496,46 +562,30 @@ function GalleryView({ events, isShowingFuture, displayTitle, darkMode }: Galler
 
   if (!events || events.length === 0) return <EmptyState darkMode={darkMode} />;
 
-  const viewToggle = (
+  const toggle = (
     <LayoutGroup>
-      <div
-        className={`absolute top-4 right-4 md:top-6 md:right-6 z-30 flex items-stretch h-9 md:h-10 border backdrop-blur-md shadow-lg ${
-          darkMode ? 'bg-[#151518]/80 border-[#2A2A2E]' : 'bg-[#FFFFFF]/80 border-[#E5E5EA]'
-        }`}
-      >
+      <div className={`flex items-stretch h-9 border ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}>
         <button
           onClick={() => setShowOverview(false)}
-          className={`relative px-4 flex items-center justify-center font-mono font-bold text-[10px] md:text-xs tracking-[0.2em] uppercase transition-colors ${
-            !showOverview 
-              ? (darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]') 
-              : (darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]')
-          }`}
+          className={`relative px-4 flex items-center justify-center font-mono font-bold text-[10px] tracking-[0.2em] uppercase transition-colors ${!showOverview ? (darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]') : (darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]')}`}
         >
           POSTER
-          {!showOverview && (
-            <motion.div layoutId="view-toggle" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#F53D04]" />
-          )}
+          {!showOverview && <motion.div layoutId="view-toggle" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#F53D04]" />}
         </button>
         <div className={`w-[1px] my-1 ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
         <button
           onClick={() => setShowOverview(true)}
-          className={`relative px-4 flex items-center justify-center font-mono font-bold text-[10px] md:text-xs tracking-[0.2em] uppercase transition-colors ${
-            showOverview 
-              ? (darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]') 
-              : (darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]')
-          }`}
+          className={`relative px-4 flex items-center justify-center font-mono font-bold text-[10px] tracking-[0.2em] uppercase transition-colors ${showOverview ? (darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]') : (darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]')}`}
         >
           OVERVIEW
-          {showOverview && (
-            <motion.div layoutId="view-toggle" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#F53D04]" />
-          )}
+          {showOverview && <motion.div layoutId="view-toggle" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#F53D04]" />}
         </button>
       </div>
     </LayoutGroup>
   );
 
   const TopBanner = isShowingFuture && (
-    <div className="w-full bg-[#F53D04] text-[#FFFFFF] py-2.5 px-4 flex items-center justify-center shrink-0 z-40 relative shadow-[0_4px_20px_rgba(245,61,4,0.3)]">
+    <div className="w-full bg-[#F53D04] text-[#FFFFFF] py-2.5 px-4 flex items-center justify-center shrink-0 z-40 relative">
       <span className="font-mono font-bold text-[10px] md:text-xs uppercase tracking-[0.2em] flex items-center gap-2">
         <Zap size={14} className="fill-current" />
         NO EVENTS TONIGHT • SHOWING {displayTitle}
@@ -545,15 +595,17 @@ function GalleryView({ events, isShowingFuture, displayTitle, darkMode }: Galler
 
   if (showOverview) {
     return (
-      <motion.div 
+      <motion.div
         variants={TAB_VARIANTS} initial="initial" animate="animate" exit="exit"
         className={`w-full h-full flex flex-col relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D]' : 'bg-[#FFFFFF]'}`}
       >
         {TopBanner}
-        <EventsOverview 
-          events={events} 
-          darkMode={darkMode} 
-          toggle={viewToggle}
+        <div className="shrink-0 flex justify-center py-2 md:py-3 relative z-30">
+          {toggle}
+        </div>
+        <EventsOverview
+          events={events}
+          darkMode={darkMode}
           displayTitle={displayTitle}
           onSelect={(index) => {
             setCurrent(index);
@@ -571,76 +623,88 @@ function GalleryView({ events, isShowingFuture, displayTitle, darkMode }: Galler
   const formattedDate = `${dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${dateObj.getFullYear()}`.toUpperCase();
 
   return (
-    <motion.div 
+    <motion.div
       variants={TAB_VARIANTS} initial="initial" animate="animate" exit="exit"
       className={`w-full h-full flex flex-col relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D]' : 'bg-[#FFFFFF]'}`}
     >
-       {TopBanner}
+      {TopBanner}
 
-       <div className="flex-1 relative flex flex-col items-center justify-center p-6 md:p-12 overflow-hidden">
-          <div className={`absolute inset-0 pointer-events-none ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
-          {viewToggle}
-          
-          <div className={`absolute inset-0 opacity-10 transition-colors duration-1000 ${current % 2 === 0 ? 'bg-[#F53D04]' : 'bg-[#5C548A]'}`} />
-          
-          <button onClick={manualPrev} className={`absolute left-2 md:left-8 z-20 p-2 md:p-3 border shadow-[0_0_15px_rgba(0,0,0,0.05)] dark:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:translate-y-1 active:shadow-none transition-colors ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF] hover:bg-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111] hover:bg-[#F7F7F9]'}`}><ChevronLeft size={20} /></button>
-          <button onClick={manualNext} className={`absolute right-2 md:right-8 z-20 p-2 md:p-3 border shadow-[0_0_15px_rgba(0,0,0,0.05)] dark:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:translate-y-1 active:shadow-none transition-colors ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF] hover:bg-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111] hover:bg-[#F7F7F9]'}`}><ChevronRight size={20} /></button>
+      <div className="shrink-0 flex justify-center py-2 md:py-3 relative z-30">
+        {toggle}
+      </div>
 
-          <AnimatePresence mode="wait">
-            <motion.div key={activeEvent.image_url || activeEvent.id || current} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ duration: 0.3 }}
-              className={`relative z-10 h-full w-auto max-w-full flex justify-center border md:border-2 p-2 md:p-4 ${darkMode ? 'bg-[#151518] border-[#2A2A2E] shadow-[0_0_40px_rgba(245,61,4,0.15)]' : 'bg-[#FFFFFF] border-[#E5E5EA] shadow-[0_0_30px_rgba(0,0,0,0.1)]'}`}>
-               <img src={activeEvent.image_url} className="h-full w-auto object-contain max-w-full" alt="Gig Poster" />
-            </motion.div>
-          </AnimatePresence>
-       </div>
+      <div className="flex-1 relative flex flex-col items-center justify-center px-10 md:px-16 pb-2 overflow-hidden min-h-0">
+        <div className={`absolute inset-0 pointer-events-none ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
 
-       <div className={`h-[220px] md:h-[240px] lg:h-[250px] shrink-0 border-t flex flex-row md:items-stretch z-20 relative ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
-          <div className={`w-1/4 md:w-[200px] shrink-0 border-r p-2 md:p-4 flex flex-col justify-center items-center text-center ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#F53D04]' : 'bg-[#FFE5DE] border-[#E5E5EA] text-[#F53D04]'}`}>
-             <span className="font-mono font-bold text-[8px] md:text-sm uppercase tracking-widest mb-1 text-inherit hidden md:block">{displayTitle}</span>
-             <span className="font-black text-3xl md:text-6xl uppercase leading-none text-inherit">{new Date(activeEvent.event_date).getDate()}</span>
-             <span className="font-black text-[10px] md:text-xl uppercase text-inherit">{new Date(activeEvent.event_date).toLocaleDateString("en-US", { month: 'short' })}</span>
-          </div>
+        <button onClick={manualPrev} className={`absolute left-2 md:left-4 z-20 p-2 border transition-colors ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF] hover:bg-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111] hover:bg-[#F7F7F9]'}`}><ChevronLeft size={18} /></button>
+        <button onClick={manualNext} className={`absolute right-2 md:right-4 z-20 p-2 border transition-colors ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF] hover:bg-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111] hover:bg-[#F7F7F9]'}`}><ChevronRight size={18} /></button>
 
-          <div className="flex-1 flex flex-col relative overflow-hidden min-w-0 h-full">
-             <div className={`w-full h-5 md:h-7 flex items-center overflow-hidden shrink-0 ${darkMode ? 'bg-[#0B0B0D] text-[#6E6E73]' : 'bg-[#E5E5EA] text-[#8C8C92]'}`}>
-               <Marquee text={`${title} / ${formattedDate} // `} />
-             </div>
-             
-             <div className={`p-4 md:p-6 overflow-y-auto flex-1 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 min-h-0 ${darkMode ? 'bg-[#151518]' : 'bg-[#F7F7F9]'}`}>
-                <div className="flex flex-col min-w-0 w-full md:flex-1">
-                  <h3 className="font-black text-lg md:text-3xl uppercase text-[#F53D04] mb-1 line-clamp-1 drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">
-                    {activeEvent.club_name}
-                  </h3>
-                  
-                  {title.length > 25 ? (
-                    <div className="whitespace-nowrap overflow-hidden py-1">
-                       <h2 className={`animate-marquee-title font-black text-3xl md:text-5xl uppercase ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
-                          {`${title} • ${title} • `}
-                       </h2>
-                    </div>
-                  ) : (
-                    <h2 className={`font-black uppercase leading-[0.85] line-clamp-2 mb-2 ${darkMode ? 'text-[#FFFFFF] drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]' : 'text-[#111111] drop-shadow-[0_0_10px_rgba(0,0,0,0.05)]'}`} style={{ fontSize: 'clamp(1.5rem, 5vw, 3rem)' }}>
-                       {title}
-                    </h2>
-                  )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeEvent.image_url || activeEvent.id || current}
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className={`relative z-10 h-full w-auto max-w-full flex justify-center border p-1.5 md:p-3 select-none ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}
+          >
+            <img src={activeEvent.image_url} className="h-full w-auto object-contain max-w-full" alt="Gig Poster" />
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
-                  <div className="flex flex-wrap gap-1.5 md:gap-2 mt-2">
-                    {(activeEvent.dj_names || []).map((dj, i) => (
-                      <span key={i} className={`px-2.5 py-1 md:px-3 md:py-1.5 font-mono font-bold text-[10px] md:text-sm uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#FFFFFF] text-[#55555A] border-[#E5E5EA]'}`}>
-                        {dj}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+      {/* Details bar — columns mirror the 5-slot mobile nav grid */}
+      <div className={`h-[88px] md:h-[180px] shrink-0 border-t flex flex-row items-stretch z-20 relative ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
 
-                <div className="shrink-0 w-full md:w-auto mt-1 md:mt-0 flex items-center justify-center">
-                  <a href={activeEvent.ig_post_url} target="_blank" rel="noreferrer" className={`w-full md:w-auto px-4 py-3 md:px-5 md:py-4 font-black uppercase tracking-widest text-[10px] md:text-xs transition-colors shadow-[0_0_15px_rgba(245,61,4,0.4)] inline-flex items-center justify-center gap-2 text-center ${darkMode ? 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#FF4D1A] hover:shadow-[0_0_25px_rgba(245,61,4,0.6)]' : 'bg-[#F53D04] text-[#FFFFFF] hover:bg-[#D93600]'}`}>
-                     <Instagram size={18} /> <span>View on Instagram</span>
-                  </a>
-                </div>
-             </div>
-          </div>
-       </div>
+        {/* Date — w-1/5 on mobile aligns center with first nav icon (Zap) */}
+        <div className={`w-1/5 md:w-[160px] shrink-0 border-r flex flex-col items-center justify-center text-center ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#F53D04]' : 'bg-[#FFE5DE] border-[#E5E5EA] text-[#F53D04]'}`}>
+          <span className="font-mono font-bold text-[6px] md:text-[10px] uppercase tracking-wider opacity-60">{new Date(activeEvent.event_date).toLocaleDateString("en-US", { weekday: 'short' }).toUpperCase()}</span>
+          <span className="font-black text-[20px] md:text-5xl uppercase leading-none">{new Date(activeEvent.event_date).getDate()}</span>
+          <span className="font-black text-[7px] md:text-base uppercase">{new Date(activeEvent.event_date).toLocaleDateString("en-US", { month: 'short' })}</span>
+        </div>
+
+        {/* Event info — spans 3 nav slots */}
+        <div className={`flex-1 flex flex-col justify-center min-w-0 px-3 py-2 md:px-6 md:py-5 ${darkMode ? 'bg-[#151518]' : 'bg-[#F7F7F9]'}`}>
+          <h3 className="font-black text-[10px] md:text-2xl uppercase text-[#F53D04] leading-none mb-0.5 line-clamp-1">
+            {activeEvent.club_name}
+          </h3>
+          {title.length > 20 ? (
+            <div className="whitespace-nowrap overflow-hidden">
+              <h2 className={`animate-marquee-title font-black text-[14px] md:text-4xl uppercase ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
+                {`${title} • ${title} • `}
+              </h2>
+            </div>
+          ) : (
+            <h2 className={`font-black uppercase leading-none line-clamp-1 md:line-clamp-2 ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`} style={{ fontSize: 'clamp(0.8rem, 2.6vw, 2.5rem)' }}>
+              {title}
+            </h2>
+          )}
+          {(() => {
+            const visibleDJs = (activeEvent.dj_names || []).filter(dj => dj.toUpperCase() !== 'HEADLINER');
+            return visibleDJs.length > 0 ? (
+              <div className="hidden md:flex flex-wrap gap-2 mt-2">
+                {visibleDJs.map((dj, i) => (
+                  <span key={i} className={`px-2 py-0.5 font-mono font-bold text-xs uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#FFFFFF] text-[#55555A] border-[#E5E5EA]'}`}>
+                    {dj}
+                  </span>
+                ))}
+              </div>
+            ) : null;
+          })()}
+        </div>
+
+        {/* Instagram — w-1/5 on mobile aligns center with last nav icon (Communities) */}
+        <a
+          href={activeEvent.ig_post_url || "#"}
+          target="_blank"
+          rel="noreferrer"
+          className={`w-1/5 md:w-24 shrink-0 flex flex-col items-center justify-center gap-1 transition-opacity active:opacity-70 ${activeEvent.ig_post_url ? '' : 'pointer-events-none opacity-30'} bg-[#F53D04] text-[#FFFFFF]`}
+          title="View on Instagram"
+        >
+          <Instagram size={20} strokeWidth={1.75} />
+          <span className="hidden md:block font-mono text-[9px] uppercase tracking-widest">Instagram</span>
+        </a>
+      </div>
     </motion.div>
   );
 }
@@ -648,46 +712,54 @@ function GalleryView({ events, isShowingFuture, displayTitle, darkMode }: Galler
 function EventsOverview({
   events,
   darkMode,
-  toggle,
   onSelect,
   displayTitle
 }: {
   events: AfterFiveEvent[];
   darkMode: boolean;
-  toggle: React.ReactNode;
   onSelect: (index: number) => void;
   displayTitle: string;
 }) {
-  return (
-    <>
-      <div className={`absolute inset-0 pointer-events-none ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
-      {toggle}
+  const [tappedIndex, setTappedIndex] = useState<number | null>(null);
+  const isTouchRef = useRef(false);
 
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col p-4 md:p-10">
-        <div className="max-w-6xl w-full mx-auto flex-1 min-h-0 flex flex-col gap-4 md:gap-6">
-          <div className={`sticky top-0 z-20 border p-3 md:p-4 shrink-0 mt-12 md:mt-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="font-mono font-bold text-[10px] md:text-xs uppercase tracking-[0.3em] text-[#F53D04] mb-2">
-                  {displayTitle}
-                </div>
-                <h1 className={`font-black text-2xl md:text-4xl uppercase leading-none ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
-                  {events.length} Events {displayTitle === "TONIGHT" ? "TODAY" : displayTitle}
-                </h1>
-              </div>
+  const handleCardClick = (index: number) => {
+    if (isTouchRef.current) {
+      if (tappedIndex === index) {
+        onSelect(index);
+        setTappedIndex(null);
+      } else {
+        setTappedIndex(index);
+      }
+    } else {
+      onSelect(index);
+    }
+  };
+
+  return (
+    <div className="relative flex-1 min-h-0 overflow-hidden">
+      <div className={`absolute inset-0 pointer-events-none ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
+
+      <div className="relative z-10 h-full overflow-y-auto hide-scrollbar px-4 md:px-10 pb-4 md:pb-10 pt-0">
+        <div className="max-w-6xl w-full mx-auto flex flex-col gap-4 md:gap-6">
+          <div className={`sticky top-0 z-20 border p-3 md:p-4 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+            <div className="font-mono font-bold text-[10px] uppercase tracking-[0.3em] text-[#F53D04] mb-1.5">
+              {displayTitle}
             </div>
-            <div className={`mt-2 font-mono text-[10px] md:text-[11px] uppercase tracking-[0.2em] ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>
-              Tap a poster to view details
-            </div>
+            <h1 className={`font-black text-2xl md:text-4xl uppercase leading-none ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
+              {events.length} {events.length === 1 ? 'Event' : 'Events'} {displayTitle === "TONIGHT" ? "TODAY" : displayTitle}
+            </h1>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 pb-4">
-              {events.map((event, index) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 pb-4">
+            {events.map((event, index) => {
+              const visibleDJs = (event.dj_names || []).filter(dj => dj.toUpperCase() !== 'HEADLINER');
+              return (
                 <div
                   key={`${event.id ?? event.club_name}-${index}`}
-                  onClick={() => onSelect(index)}
-                  className={`overview-tile group relative aspect-[3/4] w-full border overflow-hidden cursor-pointer ${darkMode ? 'bg-[#151518] border-[#2A2A2E] hover:shadow-[0_0_28px_rgba(245,61,4,0.28)]' : 'bg-[#FFFFFF] border-[#E5E5EA] hover:shadow-[0_0_24px_rgba(245,61,4,0.18)]'} transition-[box-shadow,border-color,transform] duration-200 hover:border-[#F53D04] hover:-translate-y-0.5`}
+                  onTouchStart={() => { isTouchRef.current = true; }}
+                  onClick={() => handleCardClick(index)}
+                  className={`group relative aspect-[3/4] w-full border overflow-hidden cursor-pointer transition-[border-color,transform] duration-200 hover:border-[#F53D04] hover:-translate-y-0.5 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}
                 >
                   <div className="absolute inset-0 overflow-hidden flex items-center justify-center">
                     {event.image_url ? (
@@ -703,48 +775,85 @@ function EventsOverview({
                     )}
                   </div>
 
-                  <div className="hidden md:block absolute inset-x-0 bottom-0 p-2 md:p-3 pointer-events-none overflow-hidden">
-                    <div className={`overview-tile-panel border px-3 py-3 md:px-4 md:py-4 overflow-y-auto pointer-events-auto max-h-[42%] md:max-h-[46%] ${darkMode ? 'bg-[#0B0B0D]/88 border-[#2A2A2E]' : 'bg-[#FFFFFF]/92 border-[#E5E5EA]'} backdrop-blur-sm`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="font-black text-[#F53D04] text-xs md:text-sm uppercase line-clamp-1">
-                            {event.club_name}
-                          </div>
-                          <div className={`font-black text-sm md:text-base uppercase leading-tight mt-1 ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
-                            {event.event_name || "Club Night"}
-                          </div>
-                        </div>
-                        <div className={`shrink-0 px-2 py-1 border font-mono font-bold text-[9px] md:text-[10px] uppercase ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#F2F2F5] text-[#55555A] border-[#E5E5EA]'}`}>
-                          {displayTitle === "TONIGHT" ? "TODAY" : displayTitle}
-                        </div>
+                  {/* Desktop hover reveal */}
+                  <div className="hidden md:block absolute inset-x-0 bottom-0 overflow-hidden">
+                    <div className={`translate-y-full group-hover:translate-y-0 transition-transform duration-200 ease-out p-3 border-t ${darkMode ? 'bg-[#151518]/95 border-[#2A2A2E]' : 'bg-[#FFFFFF]/97 border-[#E5E5EA]'}`}>
+                      <div className="font-black text-[#F53D04] text-xs uppercase line-clamp-1 mb-0.5">
+                        {event.club_name}
                       </div>
-
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {(event.dj_names || []).map((dj, djIndex) => (
-                          <span
-                            key={djIndex}
-                            className={`px-2 py-1 font-mono font-bold text-[9px] md:text-[10px] uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#F7F7F9] text-[#55555A] border-[#E5E5EA]'}`}
-                          >
-                            {dj}
-                          </span>
-                        ))}
+                      <div className={`font-black text-sm uppercase leading-tight line-clamp-2 ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
+                        {event.event_name || "Club Night"}
                       </div>
-
-                      {event.ig_post_url && (
-                        <div className={`mt-3 inline-flex items-center gap-2 font-black text-[10px] uppercase tracking-[0.2em] ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
-                          <Instagram size={13} />
-                          Instagram
+                      {visibleDJs.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {visibleDJs.slice(0, 3).map((dj, djIndex) => (
+                            <span key={djIndex} className={`px-1.5 py-0.5 font-mono font-bold text-[9px] uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#F7F7F9] text-[#55555A] border-[#E5E5EA]'}`}>
+                              {dj}
+                            </span>
+                          ))}
                         </div>
                       )}
                     </div>
                   </div>
+
+                  {/* Mobile tap reveal */}
+                  <AnimatePresence>
+                    {tappedIndex === index && (
+                      <motion.div
+                        className="md:hidden absolute inset-0 flex flex-col justify-end"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="absolute inset-0 bg-black/82" />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setTappedIndex(null); }}
+                          className="absolute top-2 right-2 z-20 p-1 border border-white/20 text-white/60"
+                        >
+                          <X size={11} />
+                        </button>
+                        <div className="relative z-10 p-3">
+                          <div className="font-black text-[#F53D04] text-[11px] uppercase mb-0.5 line-clamp-1">{event.club_name}</div>
+                          <div className="font-black text-white text-sm uppercase leading-tight line-clamp-2 mb-2">
+                            {event.event_name || "Club Night"}
+                          </div>
+                          {visibleDJs.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {visibleDJs.slice(0, 3).map((dj, djIdx) => (
+                                <span key={djIdx} className="px-1.5 py-0.5 font-mono text-[9px] uppercase bg-white/10 text-white/70 border border-white/20">
+                                  {dj}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onSelect(index); setTappedIndex(null); }}
+                            className="w-full py-1.5 bg-[#F53D04] text-white font-black text-[10px] uppercase tracking-widest"
+                          >
+                            VIEW →
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Touch-only "Tap for info" hint */}
+                  {tappedIndex !== index && (
+                    <div className="tap-hint absolute bottom-1.5 left-0 right-0 justify-center pointer-events-none">
+                      <span className={`px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest border ${darkMode ? 'bg-[#0B0B0D]/80 text-[#B3B3B8] border-[#2A2A2E]' : 'bg-white/90 text-[#55555A] border-[#E5E5EA]'}`}>
+                        TAP FOR INFO
+                      </span>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -770,7 +879,7 @@ function BlockListView({ title, events, darkMode }: BlockListViewProps) {
        <div className={`fixed inset-0 pointer-events-none z-0 ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
        
        <div className={`sticky top-0 z-50 border-b p-4 md:p-8 backdrop-blur-md ${darkMode ? 'bg-[#0B0B0D]/95 border-[#2A2A2E]' : 'bg-[#FFFFFF]/95 border-[#E5E5EA]'}`}>
-          <h1 className={`font-black text-4xl md:text-7xl uppercase tracking-tighter leading-none ${darkMode ? 'text-[#FFFFFF] drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]' : 'text-[#111111] drop-shadow-[0_0_15px_rgba(0,0,0,0.05)]'}`}>{title}</h1>
+          <h1 className={`font-black text-4xl md:text-7xl uppercase tracking-tighter leading-none ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>{title}</h1>
        </div>
 
         <div className="flex flex-col relative z-10">
@@ -779,7 +888,7 @@ function BlockListView({ title, events, darkMode }: BlockListViewProps) {
                const isWeekend = dateObj.getDay() === 5 || dateObj.getDay() === 6;
 
                return (
-                 <div key={date} className={`relative ${isWeekend ? 'ring-2 ring-[#F53D04] shadow-[0_0_30px_rgba(245,61,4,0.1)] z-20' : ''}`}>
+                 <div key={date} className={`relative ${isWeekend ? 'ring-1 ring-[#F53D04]/50 z-20' : ''}`}>
                     <div 
                       className={`sticky top-[69px] md:top-[137px] z-40 py-3 px-3 md:px-6 flex justify-between items-center transition-all ${
                         isWeekend 
@@ -790,7 +899,7 @@ function BlockListView({ title, events, darkMode }: BlockListViewProps) {
                        <div className="flex items-center gap-3">
                           <div className={`border px-2 py-0.5 md:py-1 font-black text-2xl md:text-3xl ${
                               isWeekend 
-                                ? 'bg-[#F53D04] text-[#FFFFFF] border-[#F53D04] shadow-[0_0_10px_rgba(245,61,4,0.3)]' 
+                                ? 'bg-[#F53D04] text-[#FFFFFF] border-[#F53D04]'
                                 : (darkMode ? 'bg-[#1C1C20] text-[#FFFFFF] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]')
                             }`}>
                             {dateObj.getDate()}
@@ -826,13 +935,18 @@ function BlockListView({ title, events, darkMode }: BlockListViewProps) {
                                       {e.event_name || "CLUB NIGHT"}
                                     </h3>
                                     
-                                    <div className="flex flex-wrap gap-1.5 mt-auto">
-                                       {(e.dj_names || []).map((dj, idx) => (
-                                         <span key={idx} className={`px-2 py-[2px] font-mono font-bold text-[10px] md:text-xs uppercase border transition-all ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E] group-hover:border-[#FFFFFF] group-hover:text-[#FFFFFF]' : 'bg-[#F2F2F5] text-[#55555A] border-[#E5E5EA] group-hover:border-[#111111] group-hover:text-[#111111]'}`}>
-                                           {dj}
-                                         </span>
-                                       ))}
-                                    </div>
+                                    {(() => {
+                                      const visibleDJs = (e.dj_names || []).filter(dj => dj.toUpperCase() !== 'HEADLINER');
+                                      return visibleDJs.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1.5 mt-auto">
+                                          {visibleDJs.map((dj, idx) => (
+                                            <span key={idx} className={`px-2 py-[2px] font-mono font-bold text-[10px] md:text-xs uppercase border transition-all ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E] group-hover:border-[#FFFFFF] group-hover:text-[#FFFFFF]' : 'bg-[#F2F2F5] text-[#55555A] border-[#E5E5EA] group-hover:border-[#111111] group-hover:text-[#111111]'}`}>
+                                              {dj}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : null;
+                                    })()}
                                   </div>
                                </div>
                           </a>
@@ -847,56 +961,158 @@ function BlockListView({ title, events, darkMode }: BlockListViewProps) {
 }
 
 function ArchiveCalendarView({ events, darkMode }: ViewProps) {
-  const grouped = events.reduce<Record<string, AfterFiveEvent[]>>((acc, event) => {
+  const [expandedDate, setExpandedDate] = useState<string | null>(null);
+
+  const byDate = events.reduce<Record<string, AfterFiveEvent[]>>((acc, event) => {
     if (!event.event_date) return acc;
-    const dateObj = new Date(event.event_date);
-    const monthYear = dateObj.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-    if (!acc[monthYear]) acc[monthYear] = [];
-    acc[monthYear].push(event);
+    const key = String(event.event_date).substring(0, 10);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(event);
     return acc;
   }, {});
 
+  const monthsMap: Record<string, string[]> = {};
+  Object.keys(byDate).forEach(dateStr => {
+    const label = new Date(dateStr).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    if (!monthsMap[label]) monthsMap[label] = [];
+    monthsMap[label].push(dateStr);
+  });
+
+  const expandedEvents = expandedDate ? byDate[expandedDate] ?? null : null;
+
   return (
-    <motion.div 
+    <motion.div
       variants={TAB_VARIANTS} initial="initial" animate="animate" exit="exit"
       className={`w-full min-h-full pb-[60px] md:pb-12 ${darkMode ? 'bg-[#0B0B0D]' : 'bg-[#FFFFFF]'}`}
     >
       <div className={`sticky top-0 z-50 border-b p-4 md:p-8 backdrop-blur-md ${darkMode ? 'bg-[#0B0B0D]/95 border-[#2A2A2E]' : 'bg-[#FFFFFF]/95 border-[#E5E5EA]'}`}>
-        <h1 className={`font-black text-4xl md:text-7xl uppercase tracking-tighter leading-none ${darkMode ? 'text-[#FFFFFF] drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]' : 'text-[#111111] drop-shadow-[0_0_10px_rgba(0,0,0,0.05)]'}`}>ARCHIVES</h1>
+        <h1 className={`font-black text-4xl md:text-7xl uppercase tracking-tighter leading-none ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>ARCHIVES</h1>
       </div>
 
       <div className="p-2 md:p-6 space-y-8 mt-2">
-        {Object.entries(grouped).map(([monthYear, monthEvents]) => (
+        {Object.entries(monthsMap).map(([monthYear, dates]) => (
           <div key={monthYear}>
             <h2 className={`font-black text-2xl uppercase mb-4 pl-2 border-l-4 border-[#F53D04] tracking-widest ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>{monthYear}</h2>
             <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1 md:gap-2">
-              {monthEvents.map((e, i) => (
-                <a key={i} href={e.ig_post_url} target="_blank" rel="noreferrer" className={`group relative aspect-square overflow-hidden block border ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
-                  {e.image_url ? (
-                    <img src={e.image_url} alt={e.event_name || e.club_name || "Archived event poster"} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  ) : (
-                    <div className={`w-full h-full flex items-center justify-center font-black text-sm ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>NO IMG</div>
-                  )}
-                  
-                  <div className={`absolute top-1 right-1 md:top-2 md:right-2 px-1.5 py-0.5 font-mono text-[9px] md:text-xs font-bold rounded-sm shadow-[0_0_8px_rgba(0,0,0,0.2)] ${darkMode ? 'bg-[#1C1C20] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#111111]'}`}>
-                    {new Date(e.event_date).getDate()} {new Date(e.event_date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
-                  </div>
+              {dates.map(date => {
+                const dateEvents = byDate[date];
+                const firstEvent = dateEvents[0];
+                const dateObj = new Date(date);
+                const isSelected = expandedDate === date;
 
-                  <div className="absolute inset-0 bg-[#0B0B0D]/90 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center text-center p-2 md:p-4">
-                    <span className="text-[#F53D04] font-black text-[9px] md:text-[11px] uppercase mb-1 line-clamp-1">{e.club_name}</span>
-                    <span className="text-[#FFFFFF] font-bold text-xs md:text-sm leading-tight line-clamp-2 mb-2">{e.event_name}</span>
-                    <div className="hidden md:flex flex-wrap justify-center gap-1">
-                      {(e.dj_names || []).slice(0, 3).map((dj, idx) => (
-                        <span key={idx} className="text-[#B3B3B8] font-mono text-[9px] uppercase">{dj}</span>
-                      ))}
+                return (
+                  <button
+                    key={date}
+                    onClick={() => setExpandedDate(isSelected ? null : date)}
+                    className={`group relative aspect-square overflow-hidden block border transition-colors ${
+                      isSelected
+                        ? 'border-[#F53D04]'
+                        : (darkMode ? 'bg-[#151518] border-[#2A2A2E] hover:border-[#F53D04]/50' : 'bg-[#F7F7F9] border-[#E5E5EA] hover:border-[#F53D04]/50')
+                    }`}
+                  >
+                    {firstEvent.image_url ? (
+                      <img
+                        src={firstEvent.image_url}
+                        alt={firstEvent.event_name || firstEvent.club_name || "Archived event"}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className={`w-full h-full flex items-center justify-center font-black text-sm ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>NO IMG</div>
+                    )}
+
+                    <div className={`absolute bottom-1 left-1 md:bottom-2 md:left-2 px-1.5 py-0.5 font-mono text-[9px] md:text-[10px] font-bold ${
+                      isSelected ? 'bg-[#F53D04] text-[#FFFFFF]' : (darkMode ? 'bg-[#0B0B0D]/80 text-[#FFFFFF]' : 'bg-[#FFFFFF]/90 text-[#111111]')
+                    }`}>
+                      {dateObj.getDate()} {dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
                     </div>
-                  </div>
-                </a>
-              ))}
+
+                    {dateEvents.length > 1 && (
+                      <div className="absolute top-1 right-1 md:top-2 md:right-2 w-5 h-5 flex items-center justify-center font-black text-[9px] bg-[#F53D04] text-[#FFFFFF]">
+                        {dateEvents.length}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
       </div>
+
+      <AnimatePresence>
+        {expandedDate && expandedEvents && (
+          <motion.div
+            className="fixed inset-0 z-[200] flex items-end md:items-center justify-center md:p-8"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setExpandedDate(null)} />
+            <motion.div
+              className={`relative w-full md:max-w-2xl overflow-hidden border ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}
+              style={{ maxHeight: '82vh' }}
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            >
+              <div className={`flex items-start justify-between p-4 md:p-6 border-b ${darkMode ? 'border-[#2A2A2E]' : 'border-[#E5E5EA]'}`}>
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#F53D04] mb-1">
+                    {new Date(expandedDate).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()}
+                  </div>
+                  <h2 className={`font-black text-xl md:text-2xl uppercase ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
+                    {new Date(expandedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
+                  </h2>
+                  <div className={`font-mono text-[10px] uppercase mt-1 ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>
+                    {expandedEvents.length} {expandedEvents.length === 1 ? 'event' : 'events'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setExpandedDate(null)}
+                  className={`p-2 border transition-colors mt-1 ${darkMode ? 'border-[#2A2A2E] text-[#B3B3B8] hover:border-[#F53D04] hover:text-[#F53D04]' : 'border-[#E5E5EA] text-[#55555A] hover:border-[#F53D04] hover:text-[#F53D04]'}`}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="overflow-y-auto hide-scrollbar" style={{ maxHeight: 'calc(82vh - 90px)' }}>
+                <div className="p-3 md:p-4 grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
+                  {expandedEvents.map((event, idx) => (
+                    <a
+                      key={idx}
+                      href={event.ig_post_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`group block border overflow-hidden transition-colors ${darkMode ? 'border-[#2A2A2E] hover:border-[#F53D04]/50' : 'border-[#E5E5EA] hover:border-[#F53D04]/50'}`}
+                    >
+                      <div className={`aspect-square w-full overflow-hidden ${darkMode ? 'bg-[#1C1C20]' : 'bg-[#F7F7F9]'}`}>
+                        {event.image_url ? (
+                          <img src={event.image_url} alt={event.event_name || event.club_name || ''} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        ) : (
+                          <div className={`w-full h-full flex items-center justify-center font-black text-sm ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>NO IMG</div>
+                        )}
+                      </div>
+                      <div className={`p-2 md:p-3 ${darkMode ? 'bg-[#151518]' : 'bg-[#FFFFFF]'}`}>
+                        <div className="font-black text-[10px] text-[#F53D04] uppercase mb-0.5 truncate">{event.club_name}</div>
+                        <div className={`font-black text-xs uppercase leading-tight line-clamp-2 ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>{event.event_name || 'CLUB NIGHT'}</div>
+                        {(() => {
+                          const visibleDJs = (event.dj_names || []).filter(dj => dj.toUpperCase() !== 'HEADLINER');
+                          return visibleDJs.length > 0 ? (
+                            <div className={`font-mono text-[9px] uppercase mt-1 truncate ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>
+                              {visibleDJs.join(' · ')}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -1018,20 +1234,13 @@ function MobileNavBtn({ icon, active, onClick, href, color, darkMode, highlight 
   );
 }
 
-function Marquee({ text }: { text: string }) {
+
+function EmptyState({ darkMode }: { darkMode?: boolean }) {
   return (
-    <div className="relative w-full overflow-hidden whitespace-nowrap">
-      <div className="animate-marquee inline-block font-mono font-bold text-[10px]">{text.repeat(10)}</div>
-      <style>{`.animate-marquee { animation: marquee 15s linear infinite; } @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>
+    <div className={`w-full h-full flex flex-col items-center justify-center p-8 text-center border m-4 ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]'}`}>
+      <h1 className="font-black text-2xl uppercase mb-2">NO SIGNAL</h1>
+      <p className={`font-mono font-bold text-xs ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>Check back later or view the Agenda.</p>
     </div>
   );
 }
 
-function EmptyState({ darkMode }: { darkMode?: boolean }) { 
-  return (
-    <div className={`w-full h-full flex flex-col items-center justify-center p-8 text-center border m-4 shadow-[0_0_20px_rgba(0,0,0,0.05)] ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]'}`}>
-      <h1 className="font-black text-2xl uppercase mb-2">NO SIGNAL</h1>
-      <p className={`font-mono font-bold text-xs ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>Check back later or view the Agenda.</p>
-    </div>
-  ); 
-}
