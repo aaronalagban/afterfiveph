@@ -4,7 +4,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { supabase } from "@/lib/supabase-client";
 import { 
   Calendar, Disc, Map as MapIcon, 
@@ -219,7 +219,27 @@ export default function AfterFivePop() {
   const tonightEvents = events.filter((e) => normalizeDbDate(e.event_date) === today);
   const upcomingEvents = events.filter((e) => normalizeDbDate(e.event_date) > today);
   const pastEvents = events.filter((e) => normalizeDbDate(e.event_date) < today).reverse();
-  const galleryData = tonightEvents.length > 0 ? tonightEvents : upcomingEvents;
+
+  let galleryData = tonightEvents;
+  let isShowingFuture = false;
+  let displayTitle = "TONIGHT";
+
+  if (tonightEvents.length === 0 && upcomingEvents.length > 0) {
+    const nextDate = normalizeDbDate(upcomingEvents[0].event_date);
+    galleryData = upcomingEvents.filter(e => normalizeDbDate(e.event_date) === nextDate);
+    isShowingFuture = true;
+    
+    const todayObj = new Date(today);
+    const nextObj = new Date(nextDate);
+    const diffTime = nextObj.getTime() - todayObj.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+    
+    if (diffDays === 1) {
+      displayTitle = "TOMORROW";
+    } else {
+      displayTitle = nextObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+    }
+  }
 
   return (
     <div className={`fixed inset-0 w-full h-full font-sans overflow-hidden flex flex-col md:flex-row transition-colors duration-300 ${darkMode ? 'bg-[#0B0B0D] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#111111]'}`}>
@@ -313,43 +333,43 @@ export default function AfterFivePop() {
       </AnimatePresence>
       
       <AnimatePresence>
-  {showBetaModal && (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <motion.div 
-        initial={{ scale: 0.9, opacity: 0 }} 
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className={`border p-8 max-w-sm w-full text-center shadow-[0_0_40px_rgba(245,61,4,0.2)] ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]'}`}
-      >
-        <h2 className="font-black text-3xl uppercase mb-4">WIP / BETA</h2>
-        
-        <p className={`font-mono text-sm mb-6 leading-relaxed ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>
-          AfterFive is currently a work in progress. If you have any suggestions or find bugs, feel free to slide into my DMs:
-          <a href="https://instagram.com/aaronalagbann" target="_blank" rel="noreferrer" className="text-[#F53D04] font-bold block mt-2 hover:underline drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">@aaronalagbann</a>
-          <span className={`block mt-4 text-xs ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>Some events may not appear yet due to current automation limits.</span>
-        </p>
+        {showBetaModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`border p-8 max-w-sm w-full text-center shadow-[0_0_40px_rgba(245,61,4,0.2)] ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]'}`}
+            >
+              <h2 className="font-black text-3xl uppercase mb-4">WIP / BETA</h2>
+              
+              <p className={`font-mono text-sm mb-6 leading-relaxed ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>
+                AfterFive is currently a work in progress. If you have any suggestions or find bugs, feel free to slide into my DMs:
+                <a href="https://instagram.com/aaronalagbann" target="_blank" rel="noreferrer" className="text-[#F53D04] font-bold block mt-2 hover:underline drop-shadow-[0_0_8px_rgba(245,61,4,0.2)]">@aaronalagbann</a>
+                <span className={`block mt-4 text-xs ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>Some events may not appear yet due to current automation limits.</span>
+              </p>
 
-        <div className="flex flex-col gap-3">
-          <a 
-            href="https://afterfiveph.vercel.app/submit"
-            target="_blank"
-            rel="noreferrer"
-            className={`block w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:border-[#F53D04] hover:text-[#F53D04]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:border-[#F53D04] hover:text-[#F53D04]'}`}
-          >
-            Submit an Event
-          </a>
+              <div className="flex flex-col gap-3">
+                <a 
+                  href="https://afterfiveph.vercel.app/submit"
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`block w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:border-[#F53D04] hover:text-[#F53D04]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:border-[#F53D04] hover:text-[#F53D04]'}`}
+                >
+                  Submit an Event
+                </a>
 
-          <button 
-            onClick={() => setShowBetaModal(false)}
-            className={`w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#F53D04] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.4)]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#F53D04] hover:text-[#FFFFFF] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.3)]'}`}
-          >
-            Aight
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  )}
-</AnimatePresence>
+                <button 
+                  onClick={() => setShowBetaModal(false)}
+                  className={`w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#F53D04] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.4)]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#F53D04] hover:text-[#FFFFFF] hover:border-[#F53D04] hover:shadow-[0_0_20px_rgba(245,61,4,0.3)]'}`}
+                >
+                  Aight
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <nav className={`hidden md:flex flex-col w-[300px] h-full border-r z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
         <div className={`h-[180px] border-b flex flex-col items-center justify-center p-6 text-center relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}>
@@ -409,9 +429,10 @@ export default function AfterFivePop() {
               <>
                 {view === "LIVE" && (
                   <GalleryView
-                    key={`LIVE-${today}-${tonightEvents.length}`}
+                    key={`LIVE-${today}-${galleryData.length}`}
                     events={galleryData}
-                    todayEvents={tonightEvents}
+                    isShowingFuture={isShowingFuture}
+                    displayTitle={displayTitle}
                     darkMode={darkMode}
                   />
                 )}
@@ -447,12 +468,13 @@ interface ViewProps {
 }
 
 interface GalleryViewProps extends ViewProps {
-  todayEvents: AfterFiveEvent[];
+  isShowingFuture: boolean;
+  displayTitle: string;
 }
 
-function GalleryView({ events, todayEvents, darkMode }: GalleryViewProps) {
+function GalleryView({ events, isShowingFuture, displayTitle, darkMode }: GalleryViewProps) {
   const [current, setCurrent] = useState(0);
-  const [showOverview, setShowOverview] = useState(todayEvents.length > 0);
+  const [showOverview, setShowOverview] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const resetTimer = useCallback(() => {
@@ -474,18 +496,72 @@ function GalleryView({ events, todayEvents, darkMode }: GalleryViewProps) {
 
   if (!events || events.length === 0) return <EmptyState darkMode={darkMode} />;
 
+  const viewToggle = (
+    <LayoutGroup>
+      <div
+        className={`absolute top-4 right-4 md:top-6 md:right-6 z-30 flex items-stretch h-9 md:h-10 border backdrop-blur-md shadow-lg ${
+          darkMode ? 'bg-[#151518]/80 border-[#2A2A2E]' : 'bg-[#FFFFFF]/80 border-[#E5E5EA]'
+        }`}
+      >
+        <button
+          onClick={() => setShowOverview(false)}
+          className={`relative px-4 flex items-center justify-center font-mono font-bold text-[10px] md:text-xs tracking-[0.2em] uppercase transition-colors ${
+            !showOverview 
+              ? (darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]') 
+              : (darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]')
+          }`}
+        >
+          POSTER
+          {!showOverview && (
+            <motion.div layoutId="view-toggle" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#F53D04]" />
+          )}
+        </button>
+        <div className={`w-[1px] my-1 ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
+        <button
+          onClick={() => setShowOverview(true)}
+          className={`relative px-4 flex items-center justify-center font-mono font-bold text-[10px] md:text-xs tracking-[0.2em] uppercase transition-colors ${
+            showOverview 
+              ? (darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]') 
+              : (darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]')
+          }`}
+        >
+          OVERVIEW
+          {showOverview && (
+            <motion.div layoutId="view-toggle" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#F53D04]" />
+          )}
+        </button>
+      </div>
+    </LayoutGroup>
+  );
+
+  const TopBanner = isShowingFuture && (
+    <div className="w-full bg-[#F53D04] text-[#FFFFFF] py-2.5 px-4 flex items-center justify-center shrink-0 z-40 relative shadow-[0_4px_20px_rgba(245,61,4,0.3)]">
+      <span className="font-mono font-bold text-[10px] md:text-xs uppercase tracking-[0.2em] flex items-center gap-2">
+        <Zap size={14} className="fill-current" />
+        NO EVENTS TONIGHT • SHOWING {displayTitle}
+      </span>
+    </div>
+  );
+
   if (showOverview) {
     return (
-      <TodayOverview 
-        events={todayEvents} 
-        darkMode={darkMode} 
-        onContinue={() => setShowOverview(false)} 
-        onSelect={(index) => {
-          setCurrent(index);
-          setShowOverview(false);
-          resetTimer();
-        }}
-      />
+      <motion.div 
+        variants={TAB_VARIANTS} initial="initial" animate="animate" exit="exit"
+        className={`w-full h-full flex flex-col relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D]' : 'bg-[#FFFFFF]'}`}
+      >
+        {TopBanner}
+        <EventsOverview 
+          events={events} 
+          darkMode={darkMode} 
+          toggle={viewToggle}
+          displayTitle={displayTitle}
+          onSelect={(index) => {
+            setCurrent(index);
+            setShowOverview(false);
+            resetTimer();
+          }}
+        />
+      </motion.div>
     );
   }
 
@@ -499,22 +575,14 @@ function GalleryView({ events, todayEvents, darkMode }: GalleryViewProps) {
       variants={TAB_VARIANTS} initial="initial" animate="animate" exit="exit"
       className={`w-full h-full flex flex-col relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D]' : 'bg-[#FFFFFF]'}`}
     >
-       <div className={`absolute inset-0 pointer-events-none ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
-       {todayEvents.length > 0 && (
-        <button
-          onClick={() => setShowOverview(true)}
-          className={`absolute top-4 right-4 md:top-6 md:right-6 z-30 px-4 py-2 md:px-5 md:py-3 font-black uppercase tracking-widest text-[10px] md:text-xs transition-colors border flex items-center justify-center gap-2 ${
-            darkMode
-              ? 'bg-[#151518]/95 text-[#FFFFFF] border-[#2A2A2E] hover:border-[#F53D04] hover:text-[#F53D04]'
-              : 'bg-[#FFFFFF]/95 text-[#111111] border-[#E5E5EA] hover:border-[#F53D04] hover:text-[#F53D04]'
-          }`}
-        >
-          <Calendar size={16} /> Tonight
-        </button>
-       )}
-      
-       <div className="flex-1 relative flex items-center justify-center p-6 md:p-12 overflow-hidden">
+       {TopBanner}
+
+       <div className="flex-1 relative flex flex-col items-center justify-center p-6 md:p-12 overflow-hidden">
+          <div className={`absolute inset-0 pointer-events-none ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
+          {viewToggle}
+          
           <div className={`absolute inset-0 opacity-10 transition-colors duration-1000 ${current % 2 === 0 ? 'bg-[#F53D04]' : 'bg-[#5C548A]'}`} />
+          
           <button onClick={manualPrev} className={`absolute left-2 md:left-8 z-20 p-2 md:p-3 border shadow-[0_0_15px_rgba(0,0,0,0.05)] dark:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:translate-y-1 active:shadow-none transition-colors ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF] hover:bg-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111] hover:bg-[#F7F7F9]'}`}><ChevronLeft size={20} /></button>
           <button onClick={manualNext} className={`absolute right-2 md:right-8 z-20 p-2 md:p-3 border shadow-[0_0_15px_rgba(0,0,0,0.05)] dark:shadow-[0_0_15px_rgba(255,255,255,0.05)] active:translate-y-1 active:shadow-none transition-colors ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF] hover:bg-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111] hover:bg-[#F7F7F9]'}`}><ChevronRight size={20} /></button>
 
@@ -522,13 +590,13 @@ function GalleryView({ events, todayEvents, darkMode }: GalleryViewProps) {
             <motion.div key={activeEvent.image_url || activeEvent.id || current} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ duration: 0.3 }}
               className={`relative z-10 h-full w-auto max-w-full flex justify-center border md:border-2 p-2 md:p-4 ${darkMode ? 'bg-[#151518] border-[#2A2A2E] shadow-[0_0_40px_rgba(245,61,4,0.15)]' : 'bg-[#FFFFFF] border-[#E5E5EA] shadow-[0_0_30px_rgba(0,0,0,0.1)]'}`}>
                <img src={activeEvent.image_url} className="h-full w-auto object-contain max-w-full" alt="Gig Poster" />
-          </motion.div>
+            </motion.div>
           </AnimatePresence>
        </div>
 
        <div className={`h-[220px] md:h-[240px] lg:h-[250px] shrink-0 border-t flex flex-row md:items-stretch z-20 relative ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
           <div className={`w-1/4 md:w-[200px] shrink-0 border-r p-2 md:p-4 flex flex-col justify-center items-center text-center ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#F53D04]' : 'bg-[#FFE5DE] border-[#E5E5EA] text-[#F53D04]'}`}>
-             <span className="font-mono font-bold text-[8px] md:text-sm uppercase tracking-widest mb-1 text-inherit hidden md:block">Happening</span>
+             <span className="font-mono font-bold text-[8px] md:text-sm uppercase tracking-widest mb-1 text-inherit hidden md:block">{displayTitle}</span>
              <span className="font-black text-3xl md:text-6xl uppercase leading-none text-inherit">{new Date(activeEvent.event_date).getDate()}</span>
              <span className="font-black text-[10px] md:text-xl uppercase text-inherit">{new Date(activeEvent.event_date).toLocaleDateString("en-US", { month: 'short' })}</span>
           </div>
@@ -577,49 +645,36 @@ function GalleryView({ events, todayEvents, darkMode }: GalleryViewProps) {
   );
 }
 
-function TodayOverview({
+function EventsOverview({
   events,
   darkMode,
-  onContinue,
+  toggle,
   onSelect,
+  displayTitle
 }: {
   events: AfterFiveEvent[];
   darkMode: boolean;
-  onContinue: () => void;
+  toggle: React.ReactNode;
   onSelect: (index: number) => void;
+  displayTitle: string;
 }) {
   return (
-    <motion.div
-      variants={TAB_VARIANTS}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className={`w-full h-full flex flex-col relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D]' : 'bg-[#FFFFFF]'}`}
-    >
+    <>
       <div className={`absolute inset-0 pointer-events-none ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
+      {toggle}
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col p-4 md:p-10">
         <div className="max-w-6xl w-full mx-auto flex-1 min-h-0 flex flex-col gap-4 md:gap-6">
-          <div className={`sticky top-0 z-20 border p-3 md:p-4 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+          <div className={`sticky top-0 z-20 border p-3 md:p-4 shrink-0 mt-12 md:mt-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="font-mono font-bold text-[10px] md:text-xs uppercase tracking-[0.3em] text-[#F53D04] mb-2">
-                  Tonight
+                  {displayTitle}
                 </div>
                 <h1 className={`font-black text-2xl md:text-4xl uppercase leading-none ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
-                  {events.length} Events Today
+                  {events.length} Events {displayTitle === "TONIGHT" ? "TODAY" : displayTitle}
                 </h1>
               </div>
-              <button
-                onClick={onContinue}
-                className={`shrink-0 px-4 py-3 font-black text-[10px] md:text-xs uppercase tracking-[0.2em] border transition-colors ${
-                  darkMode
-                    ? 'bg-[#F53D04] text-[#FFFFFF] border-[#F53D04] hover:bg-[#FF4D1A]'
-                    : 'bg-[#F53D04] text-[#FFFFFF] border-[#F53D04] hover:bg-[#D93600]'
-                }`}
-              >
-                POSTER VIEW
-              </button>
             </div>
             <div className={`mt-2 font-mono text-[10px] md:text-[11px] uppercase tracking-[0.2em] ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>
               Tap a poster to view details
@@ -660,7 +715,7 @@ function TodayOverview({
                           </div>
                         </div>
                         <div className={`shrink-0 px-2 py-1 border font-mono font-bold text-[9px] md:text-[10px] uppercase ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#F2F2F5] text-[#55555A] border-[#E5E5EA]'}`}>
-                          Today
+                          {displayTitle === "TONIGHT" ? "TODAY" : displayTitle}
                         </div>
                       </div>
 
@@ -689,7 +744,7 @@ function TodayOverview({
           </div>
         </div>
       </div>
-    </motion.div>
+    </>
   );
 }
 
@@ -978,4 +1033,5 @@ function EmptyState({ darkMode }: { darkMode?: boolean }) {
       <h1 className="font-black text-2xl uppercase mb-2">NO SIGNAL</h1>
       <p className={`font-mono font-bold text-xs ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>Check back later or view the Agenda.</p>
     </div>
-  ); }
+  ); 
+}

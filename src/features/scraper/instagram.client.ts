@@ -13,7 +13,7 @@ export class InstagramClient {
   }
 
   async fetchPosts(usernames: string[], resultsLimit?: number): Promise<InstagramPost[]> {
-    const limit = resultsLimit ?? Number(process.env.SCRAPER_RESULTS_LIMIT) || 12;
+    const limit = resultsLimit ?? (Number(process.env.SCRAPER_RESULTS_LIMIT) || 12);
     return retry(async () => {
       logger.info(`Fetching posts for ${usernames.length} usernames with limit ${limit}`);
       

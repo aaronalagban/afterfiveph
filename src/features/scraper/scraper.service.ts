@@ -4,9 +4,11 @@ import { classifier } from "./classifier";
 import { validator } from "./validator";
 import { eventService } from "../events/events.service";
 import { venueService } from "../venues/venues.service";
+import { supabase } from "../../lib/supabase";
 import { logger } from "../../lib/logger";
 import { InstagramPost, ClassificationResult } from "./types";
 import { Event } from "../events/types";
+import { Venue } from "../venues/types";
 import { createConcurrencyLimit } from "../../lib/concurrency";
 
 export class ScraperService {
@@ -27,6 +29,9 @@ export class ScraperService {
       logger.warn("No active venues found. Aborting run.");
       return;
     }
+
+    const venueByHandle = new Map<string, Venue>();
+    for (const v of venues) venueByHandle.set(v.ig_handle, v);
 
     const igHandles = venues.map(v => v.ig_handle);
     const posts = await instagramClient.fetchPosts(igHandles);
@@ -50,6 +55,12 @@ export class ScraperService {
         const username = post.ownerUsername || "unknown";
         const imageSources = post.childPosts?.length ? post.childPosts : [post];
         const captionScore = classifier.getCaptionScore(post.caption);
+
+        // Collect all displayUrls now so admin can pick a different slide later
+        const carouselImages = (post.childPosts?.length
+          ? post.childPosts.map(cp => cp.displayUrl)
+          : [post.displayUrl]
+        ).filter((u): u is string => Boolean(u));
 
         logger.info(`Processing @${username} | Caption score: ${captionScore} | Slides: ${imageSources.length}`);
 
@@ -120,20 +131,47 @@ export class ScraperService {
         }
 
         const bestEvents = eventService.resolveCarouselBestEvents(slidesData);
-        
+        const venue = venueByHandle.get(username);
+
         for (const date of Object.keys(bestEvents)) {
           const winner = bestEvents[date];
+          const igPostUrl = `${post.url}#${date}`;
+
+          // Skip if a pending review for this post+date already exists
+          const { data: existing } = await supabase
+            .from('pending_events')
+            .select('id')
+            .eq('ig_post_url', igPostUrl)
+            .eq('status', 'pending')
+            .maybeSingle();
+
+          if (existing) {
+            eventsSkipped++;
+            continue;
+          }
+
           const imageUrl = await imageService.uploadFlyer(winner.buffer, username);
-          
-          const result = await eventService.processWinningEvent({
-            ...winner,
+
+          const { error: insertError } = await supabase.from('pending_events').insert({
+            event_name: winner.event_name,
+            dj_name: winner.djs?.join(', ') || '',
+            club_name: venue?.name || username,
+            city: venue?.city || 'Makati',
+            event_date: winner.event_date,
             image_url: imageUrl,
-            ig_post_url: `${post.url}#${date}`
+            ig_post_url: igPostUrl,
+            djs: winner.djs ?? [],
+            carousel_images: carouselImages,
+            status: 'pending',
+            source: 'scraper',
           });
 
-          if (result === "inserted") eventsInserted++;
-          else if (result === "updated") eventsUpdated++;
-          else eventsSkipped++;
+          if (insertError) {
+            logger.error(`Failed to insert pending event: ${insertError.message}`);
+            eventsSkipped++;
+          } else {
+            eventsInserted++;
+          }
         }
 
       } catch (error) {

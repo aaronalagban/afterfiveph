@@ -19,7 +19,7 @@ export interface CommunityDirectoryItem {
   cover_image_url?: string;
 }
 
-const ACCESS_PASSWORD = process.env.NEXT_PUBLIC_COMMUNITIES_PASSWORD || "MANILA";
+const ACCESS_PASSWORD = process.env.NEXT_PUBLIC_COMMUNITIES_PASSWORD || "POBLACION";
 
 // --- INTERACTIVE 3D WAVE CANVAS ---
 const InteractiveWavyGrid = ({ darkMode }: { darkMode: boolean }) => {
