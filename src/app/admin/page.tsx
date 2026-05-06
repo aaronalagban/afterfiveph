@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { RefreshCw, ExternalLink, Search, X } from 'lucide-react';
+import { RefreshCw, ExternalLink, Search, X, ImageOff, Trash2 } from 'lucide-react';
 import { EditEventModal, AdminEvent } from '@/components/admin/EditEventModal';
 
 type Tab = 'pending' | 'live';
@@ -67,28 +67,51 @@ export default function AdminCMSPage() {
 
   const handleTabChange = (t: Tab) => {
     setTab(t);
-    if (t === 'live' && !liveLoaded) {
-      fetchLiveEvents();
-    }
+    if (t === 'live' && !liveLoaded) fetchLiveEvents();
   };
 
-  // ── modal success ─────────────────────────────────────────────────────────
+  // ── modal success / delete ────────────────────────────────────────────────
 
   const handleSuccess = (
     id: string,
-    action: 'saved' | 'approved',
+    action: 'saved' | 'approved' | 'deleted',
     updatedFields?: Partial<AdminEvent>
   ) => {
-    if (editingMode === 'pending') {
-      if (action === 'approved') {
-        setQueue(q => q.filter(e => e.id !== id));
-      } else if (updatedFields) {
+    const removeFromCurrent = () => {
+      if (editingMode === 'pending') setQueue(q => q.filter(e => e.id !== id));
+      else setLiveEvents(evts => evts.filter(e => e.id !== id));
+    };
+
+    if (action === 'approved' || action === 'deleted') {
+      removeFromCurrent();
+    } else if (action === 'saved' && updatedFields) {
+      if (editingMode === 'pending') {
         setQueue(q => q.map(e => (e.id === id ? { ...e, ...updatedFields } : e)));
-      }
-    } else {
-      if (updatedFields) {
+      } else {
         setLiveEvents(evts => evts.map(e => (e.id === id ? { ...e, ...updatedFields } : e)));
       }
+    }
+  };
+
+  // Delete called directly from table row (no modal open)
+  const handleTableDelete = async (event: AdminEvent, source: Tab) => {
+    if (!window.confirm(`Delete "${event.event_name}"?\n\nThis cannot be undone.`)) return;
+    const table = source === 'pending' ? 'pending_events' : 'events';
+    try {
+      const res = await fetch('/api/admin/delete-event', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, table, id: event.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(`Delete failed: ${data.message}`);
+        return;
+      }
+      if (source === 'pending') setQueue(q => q.filter(e => e.id !== event.id));
+      else setLiveEvents(evts => evts.filter(e => e.id !== event.id));
+    } catch {
+      alert('Delete failed. Check your connection.');
     }
   };
 
@@ -187,13 +210,13 @@ export default function AdminCMSPage() {
               emptyMessage="Queue is empty. Go touch grass."
               showSource
               onEdit={e => openEdit(e, 'pending')}
+              onDelete={e => handleTableDelete(e, 'pending')}
             />
           )}
 
           {/* ── Live Events ───────────────────────────────────────────── */}
           {tab === 'live' && (
             <div className="flex flex-col gap-4">
-              {/* Search bar */}
               <div className="relative max-w-sm">
                 <Search
                   size={14}
@@ -228,6 +251,7 @@ export default function AdminCMSPage() {
                 }
                 showSource={false}
                 onEdit={e => openEdit(e, 'live')}
+                onDelete={e => handleTableDelete(e, 'live')}
               />
             </div>
           )}
@@ -254,10 +278,7 @@ export default function AdminCMSPage() {
 // ─── Sub-components ────────────────────────────────────────────────────────
 
 function TabButton({
-  active,
-  onClick,
-  label,
-  count,
+  active, onClick, label, count,
 }: {
   active: boolean;
   onClick: () => void;
@@ -275,11 +296,9 @@ function TabButton({
     >
       {label}
       {count !== null && (
-        <span
-          className={`ml-2 px-1.5 py-0.5 text-[9px] font-black rounded-none ${
-            active ? 'bg-[#00E5FF]/10 text-[#00E5FF]' : 'bg-neutral-800 text-neutral-500'
-          }`}
-        >
+        <span className={`ml-2 px-1.5 py-0.5 text-[9px] font-black rounded-none ${
+          active ? 'bg-[#00E5FF]/10 text-[#00E5FF]' : 'bg-neutral-800 text-neutral-500'
+        }`}>
           {count}
         </span>
       )}
@@ -288,17 +307,14 @@ function TabButton({
 }
 
 function EventTable({
-  events,
-  loading,
-  emptyMessage,
-  showSource,
-  onEdit,
+  events, loading, emptyMessage, showSource, onEdit, onDelete,
 }: {
   events: AdminEvent[];
   loading: boolean;
   emptyMessage: string;
   showSource: boolean;
   onEdit: (e: AdminEvent) => void;
+  onDelete: (e: AdminEvent) => void;
 }) {
   if (loading && events.length === 0) {
     return (
@@ -317,12 +333,12 @@ function EventTable({
   }
 
   const cols = showSource
-    ? ['Event', 'DJs', 'Date', 'Venue', 'Source', '']
-    : ['Event', 'DJs', 'Date', 'Venue', ''];
+    ? ['Poster', 'Event', 'DJs', 'Date', 'Venue', 'Source', '']
+    : ['Poster', 'Event', 'DJs', 'Date', 'Venue', ''];
 
   return (
     <div className="overflow-x-auto border-2 border-neutral-700">
-      <table className="w-full min-w-[640px] border-collapse">
+      <table className="w-full min-w-[860px] border-collapse">
         <thead>
           <tr className="bg-neutral-900 border-b border-neutral-700">
             {cols.map(h => (
@@ -343,32 +359,51 @@ function EventTable({
                 i % 2 === 0 ? 'bg-[#111]' : 'bg-[#0d0d0d]'
               }`}
             >
-              <td className="px-4 py-3 max-w-[200px]">
+              {/* Poster thumbnail — larger so text is legible */}
+              <td className="pl-3 pr-2 py-2 w-[108px]">
+                <div className="w-24 h-[128px] overflow-hidden border border-neutral-700 bg-neutral-900 shrink-0">
+                  {event.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={event.image_url}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-neutral-700">
+                      <ImageOff size={18} />
+                    </div>
+                  )}
+                </div>
+              </td>
+
+              <td className="px-4 py-2 max-w-[200px]">
                 <p className="font-black text-sm text-white truncate">{event.event_name}</p>
               </td>
-              <td className="px-4 py-3 max-w-[160px]">
+              <td className="px-4 py-2 max-w-[160px]">
                 <p className="font-mono text-xs text-neutral-400 truncate">
                   {event.dj_name || event.djs?.join(', ') || '—'}
                 </p>
               </td>
-              <td className="px-4 py-3 whitespace-nowrap">
+              <td className="px-4 py-2 whitespace-nowrap">
                 <span className="font-mono text-xs text-neutral-300">{event.event_date}</span>
               </td>
-              <td className="px-4 py-3 max-w-[160px]">
+              <td className="px-4 py-2 max-w-[160px]">
                 <span className="font-mono text-xs text-neutral-300 truncate block">
                   {event.club_name}
                 </span>
               </td>
               {showSource && (
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td className="px-4 py-2 whitespace-nowrap">
                   <SourceBadge source={event.source} />
                 </td>
               )}
-              <td className="px-4 py-3 whitespace-nowrap">
+              <td className="px-4 py-2 whitespace-nowrap">
                 <div className="flex items-center gap-2">
                   {event.ig_post_url && (
                     <a
-                      href={event.ig_post_url}
+                      href={event.ig_post_url.split('#')[0]}
                       target="_blank"
                       rel="noreferrer"
                       className="p-1.5 border border-neutral-700 text-neutral-500 hover:text-white hover:border-neutral-500 transition-colors"
@@ -382,6 +417,13 @@ function EventTable({
                     className="px-3 py-1.5 border-2 border-neutral-600 text-xs font-black uppercase hover:border-[#00E5FF] hover:text-[#00E5FF] transition-colors"
                   >
                     Edit
+                  </button>
+                  <button
+                    onClick={() => onDelete(event)}
+                    className="p-1.5 border border-neutral-700 text-neutral-600 hover:border-[#FF3D00] hover:text-[#FF3D00] transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 size={12} />
                   </button>
                 </div>
               </td>

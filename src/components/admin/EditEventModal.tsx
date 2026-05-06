@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from 'react';
-import { X, Save, CheckCircle, Loader, ExternalLink } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { X, Save, CheckCircle, Loader, ExternalLink, ImageOff, ScanSearch, Trash2 } from 'lucide-react';
 import { ImageGridSelector } from './ImageGridSelector';
 import { DJCombobox } from './DJCombobox';
 
-// Covers both pending_events and live events rows uniformly
 export interface AdminEvent {
   id: string;
   event_name: string;
@@ -16,24 +15,24 @@ export interface AdminEvent {
   image_url: string | null;
   ig_post_url: string | null;
   djs: string[] | null;
-  // only present on pending events
   carousel_images: string[] | null;
   source: string | null;
   status: string | null;
   created_at: string | null;
 }
 
-// Backwards-compat alias used by the page
 export type PendingEvent = AdminEvent;
 
 interface EditEventModalProps {
   event: AdminEvent;
   password: string;
-  /** 'pending' shows the Approve button and saves to pending_events.
-   *  'live' hides Approve and saves directly to the events table. */
   mode: 'pending' | 'live';
   onClose: () => void;
-  onSuccess: (id: string, action: 'saved' | 'approved', updatedFields?: Partial<AdminEvent>) => void;
+  onSuccess: (
+    id: string,
+    action: 'saved' | 'approved' | 'deleted',
+    updatedFields?: Partial<AdminEvent>
+  ) => void;
 }
 
 type FormState = {
@@ -56,29 +55,74 @@ export function EditEventModal({ event, password, mode, onClose, onSuccess }: Ed
     image_url: event.image_url ?? '',
     djs: event.djs ?? [],
   });
+
+  const [localCarousel, setLocalCarousel] = useState<string[]>(event.carousel_images ?? []);
+  const [fetchingCarousel, setFetchingCarousel] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const [posterError, setPosterError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const busy = saving || approving;
+  const busy = saving || approving || deleting || fetchingCarousel;
+  const hasCarousel = localCarousel.length > 0;
+  const canFetch = !!event.ig_post_url && !hasCarousel;
+
+  // Resets poster error state whenever the URL changes
+  const handleImageUrlChange = useCallback((url: string) => {
+    setPosterError(false);
+    setForm(f => ({ ...f, image_url: url }));
+  }, []);
 
   const setField = (key: keyof FormState, value: string) =>
     setForm(f => ({ ...f, [key]: value }));
 
+  // ── Carousel fetcher ──────────────────────────────────────────────────────
+
+  const fetchCarousel = async () => {
+    setFetchingCarousel(true);
+    setFetchError(null);
+    try {
+      const res = await fetch('/api/admin/fetch-carousel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, igPostUrl: event.ig_post_url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? 'Fetch failed');
+      if (!data.images?.length) throw new Error('No images found in this post.');
+      setLocalCarousel(data.images as string[]);
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : 'Fetch failed');
+    } finally {
+      setFetchingCarousel(false);
+    }
+  };
+
+  // ── Patch (always includes carousel_images if present) ───────────────────
+
   const patchEvent = () => {
+    const fields = {
+      ...form,
+      ...(localCarousel.length > 0 ? { carousel_images: localCarousel } : {}),
+    };
     if (mode === 'live') {
       return fetch('/api/admin/update-live', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, eventId: event.id, fields: form }),
+        body: JSON.stringify({ password, eventId: event.id, fields }),
       });
     }
     return fetch('/api/admin/update-pending', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password, pendingEventId: event.id, fields: form }),
+      body: JSON.stringify({ password, pendingEventId: event.id, fields }),
     });
   };
+
+  // ── Actions ───────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
     setSaving(true);
@@ -87,7 +131,14 @@ export function EditEventModal({ event, password, mode, onClose, onSuccess }: Ed
       const res = await patchEvent();
       const data = await res.json();
       if (!res.ok) throw new Error(data.message ?? 'Save failed');
-      onSuccess(event.id, 'saved', form);
+
+      const finalFields: Partial<AdminEvent> = {
+        ...form,
+        ...(data.image_url ? { image_url: data.image_url as string } : {}),
+        ...(localCarousel.length > 0 ? { carousel_images: localCarousel } : {}),
+      };
+
+      onSuccess(event.id, 'saved', finalFields);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
@@ -104,13 +155,11 @@ export function EditEventModal({ event, password, mode, onClose, onSuccess }: Ed
     setApproving(true);
     setError(null);
     try {
-      // Flush edits first so approve-event reads the latest state
       const patchRes = await patchEvent();
       if (!patchRes.ok) {
         const d = await patchRes.json();
         throw new Error(d.message ?? 'Could not save edits');
       }
-
       const res = await fetch('/api/admin/approve-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -118,7 +167,6 @@ export function EditEventModal({ event, password, mode, onClose, onSuccess }: Ed
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message ?? 'Approve failed');
-
       onSuccess(event.id, 'approved');
       onClose();
     } catch (e) {
@@ -128,12 +176,36 @@ export function EditEventModal({ event, password, mode, onClose, onSuccess }: Ed
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete "${form.event_name}"?\n\nThis cannot be undone.`)) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const table = mode === 'live' ? 'events' : 'pending_events';
+      const res = await fetch('/api/admin/delete-event', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, table, id: event.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? 'Delete failed');
+      onSuccess(event.id, 'deleted');
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-2xl bg-[#111] border-2 border-neutral-700 shadow-[8px_8px_0px_#000] max-h-[90vh] flex flex-col">
+      <div className="w-full max-w-3xl bg-[#111] border-2 border-neutral-700 shadow-[8px_8px_0px_#000] max-h-[90vh] flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 shrink-0">
@@ -150,7 +222,7 @@ export function EditEventModal({ event, password, mode, onClose, onSuccess }: Ed
             </div>
             {event.ig_post_url && (
               <a
-                href={event.ig_post_url}
+                href={event.ig_post_url.split('#')[0]}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-1 mt-1 text-neutral-500 hover:text-white font-mono text-[10px] transition-colors"
@@ -167,73 +239,110 @@ export function EditEventModal({ event, password, mode, onClose, onSuccess }: Ed
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 p-6 flex flex-col gap-5">
 
+          {/* Text fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Event Name">
-              <input
-                className={inputCls}
-                value={form.event_name}
-                onChange={e => setField('event_name', e.target.value)}
-              />
+              <input className={inputCls} value={form.event_name}
+                onChange={e => setField('event_name', e.target.value)} />
             </Field>
             <Field label="Club / Venue">
-              <input
-                className={inputCls}
-                value={form.club_name}
-                onChange={e => setField('club_name', e.target.value)}
-              />
+              <input className={inputCls} value={form.club_name}
+                onChange={e => setField('club_name', e.target.value)} />
             </Field>
             <Field label="City">
-              <input
-                className={inputCls}
-                value={form.city}
-                onChange={e => setField('city', e.target.value)}
-              />
+              <input className={inputCls} value={form.city}
+                onChange={e => setField('city', e.target.value)} />
             </Field>
             <Field label="Event Date">
-              <input
-                type="date"
-                className={inputCls}
-                value={form.event_date}
-                onChange={e => setField('event_date', e.target.value)}
-              />
+              <input type="date" className={inputCls} value={form.event_date}
+                onChange={e => setField('event_date', e.target.value)} />
             </Field>
           </div>
 
           <Field label="DJ Name (display text)">
-            <input
-              className={inputCls}
-              placeholder="e.g. DJ A, DJ B"
-              value={form.dj_name}
-              onChange={e => setField('dj_name', e.target.value)}
-            />
+            <input className={inputCls} placeholder="e.g. DJ A, DJ B"
+              value={form.dj_name} onChange={e => setField('dj_name', e.target.value)} />
           </Field>
 
           <Field label="DJs (searchable tags)">
-            <DJCombobox
-              selected={form.djs}
-              onChange={djs => setForm(f => ({ ...f, djs }))}
-            />
+            <DJCombobox selected={form.djs} onChange={djs => setForm(f => ({ ...f, djs }))} />
           </Field>
 
-          {/* Carousel picker — only present on pending/AI events */}
-          {(event.carousel_images?.length ?? 0) > 0 && (
-            <Field label="Select Flyer Image">
-              <ImageGridSelector
-                carouselImages={event.carousel_images!}
-                selectedUrl={form.image_url || null}
-                onChange={url => setField('image_url', url)}
+          {/* ── Image section — vertical stack ─────────────────────────────── */}
+          <div className="flex flex-col gap-3">
+
+            {/* Large Current Poster preview — updates instantly on carousel click */}
+            <Field label="Current Poster">
+              <div className="w-full h-[360px] bg-neutral-900 border-2 border-neutral-600 flex items-center justify-center overflow-hidden">
+                {form.image_url && !posterError ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={form.image_url}
+                    src={form.image_url}
+                    alt="Current poster"
+                    referrerPolicy="no-referrer"
+                    onError={() => setPosterError(true)}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-neutral-600">
+                    <ImageOff size={32} />
+                    <span className="font-mono text-xs uppercase">
+                      {posterError ? 'Load failed' : 'No Image'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </Field>
+
+            {/* Carousel grid (full width now that it's stacked) */}
+            {hasCarousel ? (
+              <Field label="Select from Carousel — click to update preview above">
+                <ImageGridSelector
+                  carouselImages={localCarousel}
+                  selectedUrl={form.image_url || null}
+                  onChange={handleImageUrlChange}
+                  cols={4}
+                />
+              </Field>
+            ) : (
+              <Field label="Carousel Slides">
+                <div className="flex flex-col gap-2 border-2 border-dashed border-neutral-700 bg-neutral-900/40 p-5">
+                  <p className="font-mono text-xs text-neutral-500">
+                    {!canFetch
+                      ? 'No IG URL stored — paste a URL in the field below.'
+                      : fetchError
+                      ? <span className="text-[#FF3D00]">{fetchError} — try again?</span>
+                      : 'No slides cached. Fetch them from Instagram to pick the right poster.'}
+                  </p>
+                  {canFetch && (
+                    <button
+                      type="button"
+                      onClick={fetchCarousel}
+                      disabled={busy}
+                      className="self-start flex items-center gap-2 px-4 py-2 border-2 border-neutral-600 text-white font-black uppercase text-xs hover:border-[#00E5FF] hover:text-[#00E5FF] disabled:opacity-40 transition-colors"
+                    >
+                      {fetchingCarousel ? (
+                        <><Loader size={13} className="animate-spin" /> Fetching... (~15s)</>
+                      ) : (
+                        <><ScanSearch size={13} /> Fetch Carousel from Instagram</>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </Field>
+            )}
+
+            {/* Manual URL override */}
+            <Field label="Image URL (manual override)">
+              <input
+                className={`${inputCls} font-mono text-xs`}
+                placeholder="https://..."
+                value={form.image_url}
+                onChange={e => handleImageUrlChange(e.target.value)}
               />
             </Field>
-          )}
-
-          <Field label="Image URL">
-            <input
-              className={`${inputCls} font-mono text-xs`}
-              placeholder="https://..."
-              value={form.image_url}
-              onChange={e => setField('image_url', e.target.value)}
-            />
-          </Field>
+          </div>
 
           {error && (
             <p className="text-[#FF3D00] font-mono text-xs border border-[#FF3D00]/60 bg-[#FF3D00]/5 px-3 py-2">
@@ -243,7 +352,17 @@ export function EditEventModal({ event, password, mode, onClose, onSuccess }: Ed
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 px-6 py-4 border-t border-neutral-800 shrink-0">
+        <div className="flex items-stretch gap-3 px-6 py-4 border-t border-neutral-800 shrink-0">
+          {/* Delete — icon-only to save space */}
+          <button
+            onClick={handleDelete}
+            disabled={busy}
+            title="Delete this event"
+            className="flex items-center justify-center px-3 border-2 border-[#FF3D00]/50 text-[#FF3D00] hover:bg-[#FF3D00] hover:text-black hover:border-[#FF3D00] disabled:opacity-40 transition-colors"
+          >
+            {deleting ? <Loader size={14} className="animate-spin" /> : <Trash2 size={14} />}
+          </button>
+
           <button
             onClick={handleSave}
             disabled={busy}
@@ -269,7 +388,7 @@ export function EditEventModal({ event, password, mode, onClose, onSuccess }: Ed
   );
 }
 
-// ─── helpers ───────────────────────────────────────────────────────────────
+// ─── helpers ────────────────────────────────────────────────────────────────
 
 const inputCls =
   'w-full bg-[#1a1a1a] border-2 border-neutral-700 text-white p-2 font-mono text-sm focus:border-[#00E5FF] outline-none placeholder:text-neutral-600';

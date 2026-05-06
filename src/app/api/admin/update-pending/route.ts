@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { uploadImageIfNeeded } from '@/lib/image-upload';
 
 function getAdminClient() {
   return createClient(
@@ -17,6 +18,7 @@ const ALLOWED_FIELDS = new Set([
   'image_url',
   'ig_post_url',
   'djs',
+  'carousel_images',
 ]);
 
 export async function PATCH(request: Request) {
@@ -31,7 +33,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: 'Invalid request body' }, { status: 400 });
     }
 
-    const sanitized = Object.fromEntries(
+    const sanitized: Record<string, unknown> = Object.fromEntries(
       Object.entries(fields).filter(([key]) => ALLOWED_FIELDS.has(key))
     );
 
@@ -40,6 +42,15 @@ export async function PATCH(request: Request) {
     }
 
     const supabase = getAdminClient();
+
+    // Re-host any raw IG / external image URL into Supabase storage
+    if (typeof sanitized.image_url === 'string' && sanitized.image_url) {
+      sanitized.image_url = await uploadImageIfNeeded(
+        sanitized.image_url,
+        supabase,
+        String(pendingEventId)
+      );
+    }
 
     const { error } = await supabase
       .from('pending_events')
@@ -50,7 +61,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, image_url: sanitized.image_url ?? null });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ message }, { status: 500 });

@@ -42,7 +42,12 @@ const TARGET_ACCOUNTS = [
   "apothekamanila",
   "openhouse.world",
   "umaafterdark",
-  "uglyduckpoblacion"
+  "uglyduckpoblacion",
+  "d___bodega",
+  "velveteen.house",
+  "electric.sala",
+  "nokal.manila",
+  "huai_ph"
 ];
 
 const PRIORITY = {
