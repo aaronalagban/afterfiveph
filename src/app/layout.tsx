@@ -5,7 +5,7 @@ import './globals.css';
 
 // 1. Viewport settings (separate from metadata in Next.js 14+)
 export const viewport: Viewport = {
-  themeColor: '#0B0B0D',
+  themeColor: '#050505',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -109,7 +109,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Structured Data for Search Engines */}
+        <meta name="theme-color" content="#050505" />
+        <meta name="color-scheme" content="dark" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

@@ -1,12 +1,17 @@
 @import "tailwindcss";
 
-/* If you want to keep the custom background logic I gave you */
 :root {
   --background: #050505;
   --foreground: #ffffff;
+  color-scheme: dark;
+}
+
+html {
+  background: var(--background);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: system-ui, -apple-system, sans-serif;}
+  font-family: system-ui, -apple-system, sans-serif;
+}
