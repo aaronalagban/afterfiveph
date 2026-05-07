@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from 'react';
-import { RefreshCw, ExternalLink, Search, X, ImageOff, Trash2 } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import { RefreshCw, ExternalLink, Search, X, ImageOff, Trash2, Share2 } from 'lucide-react';
 import { EditEventModal, AdminEvent } from '@/components/admin/EditEventModal';
+import WeeklyLineupModal from '@/components/admin/WeeklyLineupModal';
+import { type StoryEvent } from '@/components/admin/generateWeeklyStory';
 
 type Tab = 'pending' | 'live';
 
@@ -22,6 +25,8 @@ export default function AdminCMSPage() {
 
   const [editingEvent, setEditingEvent] = useState<AdminEvent | null>(null);
   const [editingMode, setEditingMode] = useState<Tab>('pending');
+
+  const [showLineup, setShowLineup] = useState(false);
 
   // ── fetchers ──────────────────────────────────────────────────────────────
 
@@ -45,7 +50,7 @@ export default function AdminCMSPage() {
     }
   };
 
-  const fetchLiveEvents = async (pass = password) => {
+  const fetchLiveEvents = async (pass = password): Promise<AdminEvent[]> => {
     setLoadingLive(true);
     try {
       const res = await fetch('/api/admin/live-events', {
@@ -55,9 +60,12 @@ export default function AdminCMSPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setLiveEvents(data.events ?? []);
+        const fetched: AdminEvent[] = data.events ?? [];
+        setLiveEvents(fetched);
         setLiveLoaded(true);
+        return fetched;
       }
+      return [];
     } finally {
       setLoadingLive(false);
     }
@@ -176,14 +184,27 @@ export default function AdminCMSPage() {
             <h1 className="font-black text-3xl uppercase tracking-tighter text-[#00E5FF]">
               Admin CMS
             </h1>
-            <button
-              onClick={() => tab === 'pending' ? fetchQueue(password) : fetchLiveEvents()}
-              disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2 border-2 border-neutral-700 font-mono text-sm hover:bg-neutral-800 disabled:opacity-50 transition-colors self-start sm:self-auto"
-            >
-              <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
-              Refresh
-            </button>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                onClick={async () => {
+                  if (!liveLoaded) await fetchLiveEvents();
+                  setShowLineup(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-[#F53D04] text-white font-black text-xs uppercase tracking-widest hover:bg-[#FF5520] transition-colors"
+                title="Curate and share this week's lineup as an Instagram Story"
+              >
+                <Share2 size={13} />
+                Weekly Story
+              </button>
+              <button
+                onClick={() => tab === 'pending' ? fetchQueue(password) : fetchLiveEvents()}
+                disabled={isLoading}
+                className="flex items-center gap-2 px-4 py-2 border-2 border-neutral-700 font-mono text-sm hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+              >
+                <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -271,6 +292,16 @@ export default function AdminCMSPage() {
           }}
         />
       )}
+
+      <AnimatePresence>
+        {showLineup && (
+          <WeeklyLineupModal
+            events={liveEvents as StoryEvent[]}
+            darkMode={true}
+            onClose={() => setShowLineup(false)}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }

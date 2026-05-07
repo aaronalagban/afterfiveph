@@ -1,7 +1,7 @@
-import { Analytics } from "@vercel/analytics/react";
-import './globals.css'; 
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { Analytics } from "@vercel/analytics/react";
+import './globals.css';
 
 // 1. Viewport settings (separate from metadata in Next.js 14+)
 export const viewport: Viewport = {
@@ -11,7 +11,6 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-// 2. Comprehensive Metadata
 export const metadata: Metadata = {
   metadataBase: new URL('https://afterfive.ph'),
   title: {
@@ -32,7 +31,6 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  // Social & Icons
   icons: {
     icon: [
       { url: '/logo-1.png' },
@@ -48,7 +46,7 @@ export const metadata: Metadata = {
     description: 'Explore Manila’s premier bars and clubs. Your curated guide to the city’s nightlife after five.',
     siteName: 'AfterFivePH',
     images: [{
-      url: '/logo-1.png', // Ideally, use a 1200x630px image later for better social sharing
+      url: '/logo-1.png',
       width: 1200,
       height: 630,
       alt: 'AfterFivePH - Manila Nightlife Guide',

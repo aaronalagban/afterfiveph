@@ -9,10 +9,12 @@ import { supabase } from "@/lib/supabase-client";
 import {
   Calendar, Disc, Map as MapIcon,
   X, Zap, Instagram, ChevronLeft, ChevronRight,
-  Sun, Moon, Plus, Users, Info
+  Sun, Moon, Plus, Users, Info, Share2
 } from "lucide-react";
 import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
 import Link from "next/link";
+import WeeklyLineupModal from "@/components/admin/WeeklyLineupModal";
+import { type StoryEvent } from "@/components/admin/generateWeeklyStory";
 
 export interface AfterFiveEvent {
   id?: string | number;
@@ -91,7 +93,8 @@ export default function AfterFivePop() {
   const [view, setView] = useState<"LIVE" | "AGENDA" | "MAP" | "ARCHIVE">("LIVE");
   const [darkMode, setDarkMode] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
-  
+  const [showLineup, setShowLineup] = useState(false);
+
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded: isMapLoaded } = useLoadScript({ googleMapsApiKey: googleMapsKey || "" });
 
@@ -381,17 +384,25 @@ export default function AfterFivePop() {
           />
         </div>
 
-        <div className={`p-4 flex justify-between items-center border-t font-mono text-[10px] uppercase tracking-wider ${darkMode ? 'bg-[#151518] border-[#2A2A2E] text-[#B3B3B8]' : 'bg-[#F7F7F9] border-[#E5E5EA] text-[#55555A]'}`}>
-          <a href="/submit" className="hover:text-[#F53D04] transition-colors flex items-center gap-1 group">
-            <Plus size={12} className="group-hover:rotate-90 transition-transform" /> Submit Event
-          </a>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setShowInfo(true)} className="hover:text-[#F53D04] transition-colors flex items-center gap-1">
-              <Info size={12} /> Info
-            </button>
-            <button onClick={() => setDarkMode(!darkMode)} className="hover:text-[#F53D04] transition-colors flex items-center gap-1">
-              {darkMode ? <Sun size={12} /> : <Moon size={12} />} Theme
-            </button>
+        <div className={`border-t font-mono text-[10px] uppercase tracking-wider ${darkMode ? 'bg-[#151518] border-[#2A2A2E] text-[#B3B3B8]' : 'bg-[#F7F7F9] border-[#E5E5EA] text-[#55555A]'}`}>
+          <button
+            onClick={() => setShowLineup(true)}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 font-mono text-[10px] uppercase tracking-widest border-b transition-colors ${darkMode ? 'border-[#2A2A2E] hover:bg-[#F53D04] hover:text-white' : 'border-[#E5E5EA] hover:bg-[#F53D04] hover:text-white'}`}
+          >
+            <Share2 size={11} /> Share This Week
+          </button>
+          <div className="p-4 flex justify-between items-center">
+            <a href="/submit" className="hover:text-[#F53D04] transition-colors flex items-center gap-1 group">
+              <Plus size={12} className="group-hover:rotate-90 transition-transform" /> Submit Event
+            </a>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setShowInfo(true)} className="hover:text-[#F53D04] transition-colors flex items-center gap-1">
+                <Info size={12} /> Info
+              </button>
+              <button onClick={() => setDarkMode(!darkMode)} className="hover:text-[#F53D04] transition-colors flex items-center gap-1">
+                {darkMode ? <Sun size={12} /> : <Moon size={12} />} Theme
+              </button>
+            </div>
           </div>
         </div>
         
@@ -400,7 +411,14 @@ export default function AfterFivePop() {
       <main className="flex-1 w-full h-full relative overflow-hidden flex flex-col">
         <div className={`md:hidden h-12 w-full border-b flex items-center justify-between px-4 z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
           <img src="/logo-1.png" alt="AfterFive Logo" className="h-5 w-auto cursor-pointer" onClick={() => setView("LIVE")} />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowLineup(true)}
+              title="Share This Week"
+              className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#F53D04]' : 'text-[#8C8C92] hover:text-[#F53D04]'}`}
+            >
+              <Share2 size={15} />
+            </button>
             <a
               href="/submit"
               className={`font-black text-[9px] uppercase tracking-widest border px-2.5 py-1 transition-colors flex items-center gap-1 ${darkMode ? 'border-[#2A2A2E] text-[#B3B3B8] hover:border-[#F53D04] hover:text-[#F53D04]' : 'border-[#E5E5EA] text-[#55555A] hover:border-[#F53D04] hover:text-[#F53D04]'}`}
@@ -508,6 +526,16 @@ export default function AfterFivePop() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showLineup && (
+          <WeeklyLineupModal
+            events={events as StoryEvent[]}
+            darkMode={darkMode}
+            onClose={() => setShowLineup(false)}
+          />
         )}
       </AnimatePresence>
 

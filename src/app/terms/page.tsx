@@ -36,10 +36,14 @@ export default function TermsPage() {
             </p>
           </Section>
 
-          <Section title="2. About the Platform">
+          <Section title="2. Nature of the Platform">
             <p>
-              AfterFivePH is an independent event discovery platform that aggregates and displays nightlife events in Metro Manila, Philippines. We are not an event organizer, ticketing agent, or venue operator. We are not responsible for the accuracy, completeness, or outcome of any listed event.
+              AfterFivePH primarily operates as an independent event discovery platform that aggregates and displays nightlife events in Metro Manila, Philippines.
             </p>
+            <ul className="list-none space-y-2 pl-4 border-l border-[#1A1A1E]">
+              <Li><b>Third-Party Events:</b> For the majority of listings, AfterFivePH is not the event organizer, ticketing agent, or venue operator. We provide information for convenience only and are not responsible for the accuracy, cancellations, or safety of these events.</Li>
+              <Li><b>AfterFivePH Produced Events:</b> In instances where AfterFivePH acts as a promoter, organizer, or performer (e.g., DJ sets or branded activations), such events will be clearly labeled. For these specific events, liability is limited to the extent permitted by Philippine law and governed by specific event-entry rules.</Li>
+            </ul>
           </Section>
 
           <Section title="3. Eligibility">
