@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { RefreshCw, ExternalLink, Search, X, ImageOff, Trash2, Share2 } from 'lucide-react';
+import { RefreshCw, ExternalLink, Search, X, ImageOff, Trash2, Share2, BarChart2, Database } from 'lucide-react';
 import { EditEventModal, AdminEvent } from '@/components/admin/EditEventModal';
 import WeeklyLineupModal from '@/components/admin/WeeklyLineupModal';
 import { type StoryEvent } from '@/components/admin/generateWeeklyStory';
+import { CleanupTabContent } from '@/features/admin/data-cleanup/DataCleanupDashboard';
+import { StatsTab } from '@/features/admin/StatsTab';
 
-type Tab = 'pending' | 'live';
+type Tab = 'pending' | 'live' | 'cleanup' | 'stats';
 
 export default function AdminCMSPage() {
   const [password, setPassword] = useState('');
@@ -24,7 +26,7 @@ export default function AdminCMSPage() {
   const [liveSearch, setLiveSearch] = useState('');
 
   const [editingEvent, setEditingEvent] = useState<AdminEvent | null>(null);
-  const [editingMode, setEditingMode] = useState<Tab>('pending');
+  const [editingMode, setEditingMode] = useState<'pending' | 'live'>('pending');
 
   const [showLineup, setShowLineup] = useState(false);
 
@@ -85,13 +87,9 @@ export default function AdminCMSPage() {
     action: 'saved' | 'approved' | 'deleted',
     updatedFields?: Partial<AdminEvent>
   ) => {
-    const removeFromCurrent = () => {
+    if (action === 'approved' || action === 'deleted') {
       if (editingMode === 'pending') setQueue(q => q.filter(e => e.id !== id));
       else setLiveEvents(evts => evts.filter(e => e.id !== id));
-    };
-
-    if (action === 'approved' || action === 'deleted') {
-      removeFromCurrent();
     } else if (action === 'saved' && updatedFields) {
       if (editingMode === 'pending') {
         setQueue(q => q.map(e => (e.id === id ? { ...e, ...updatedFields } : e)));
@@ -101,8 +99,7 @@ export default function AdminCMSPage() {
     }
   };
 
-  // Delete called directly from table row (no modal open)
-  const handleTableDelete = async (event: AdminEvent, source: Tab) => {
+  const handleTableDelete = async (event: AdminEvent, source: 'pending' | 'live') => {
     if (!window.confirm(`Delete "${event.event_name}"?\n\nThis cannot be undone.`)) return;
     const table = source === 'pending' ? 'pending_events' : 'events';
     try {
@@ -123,7 +120,7 @@ export default function AdminCMSPage() {
     }
   };
 
-  const openEdit = (event: AdminEvent, mode: Tab) => {
+  const openEdit = (event: AdminEvent, mode: 'pending' | 'live') => {
     setEditingEvent(event);
     setEditingMode(mode);
   };
@@ -147,8 +144,7 @@ export default function AdminCMSPage() {
     return (
       <div className="min-h-screen bg-[#121212] flex items-center justify-center p-4">
         <div className="w-full max-w-sm border-2 border-neutral-700 bg-black p-8 shadow-[4px_4px_0px_rgba(0,229,255,0.5)]">
-          <h1 className="text-white font-black text-2xl mb-1 uppercase">Admin CMS</h1>
-          <p className="text-neutral-500 font-mono text-xs mb-6">Unified Queue &amp; Live Edit</p>
+          <h1 className="text-white font-black text-2xl mb-6 uppercase">Admin CMS</h1>
           <input
             type="password"
             placeholder="PASSWORD"
@@ -172,7 +168,7 @@ export default function AdminCMSPage() {
 
   // ── dashboard ─────────────────────────────────────────────────────────────
 
-  const isLoading = tab === 'pending' ? loadingQueue : loadingLive;
+  const isLoading = tab === 'pending' ? loadingQueue : tab === 'live' ? loadingLive : false;
 
   return (
     <>
@@ -196,19 +192,21 @@ export default function AdminCMSPage() {
                 <Share2 size={13} />
                 Weekly Story
               </button>
-              <button
-                onClick={() => tab === 'pending' ? fetchQueue(password) : fetchLiveEvents()}
-                disabled={isLoading}
-                className="flex items-center gap-2 px-4 py-2 border-2 border-neutral-700 font-mono text-sm hover:bg-neutral-800 disabled:opacity-50 transition-colors"
-              >
-                <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
-                Refresh
-              </button>
+              {(tab === 'pending' || tab === 'live') && (
+                <button
+                  onClick={() => tab === 'pending' ? fetchQueue(password) : fetchLiveEvents()}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 px-4 py-2 border-2 border-neutral-700 font-mono text-sm hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                >
+                  <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+                  Refresh
+                </button>
+              )}
             </div>
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b-2 border-neutral-800 mb-6">
+          <div className="flex border-b-2 border-neutral-800 mb-6 overflow-x-auto">
             <TabButton
               active={tab === 'pending'}
               onClick={() => handleTabChange('pending')}
@@ -220,6 +218,20 @@ export default function AdminCMSPage() {
               onClick={() => handleTabChange('live')}
               label="Live Events"
               count={liveLoaded ? liveEvents.length : null}
+            />
+            <TabButton
+              active={tab === 'cleanup'}
+              onClick={() => handleTabChange('cleanup')}
+              label="Data Cleanup"
+              count={null}
+              icon={<Database size={11} />}
+            />
+            <TabButton
+              active={tab === 'stats'}
+              onClick={() => handleTabChange('stats')}
+              label="Analytics"
+              count={null}
+              icon={<BarChart2 size={11} />}
             />
           </div>
 
@@ -277,6 +289,16 @@ export default function AdminCMSPage() {
             </div>
           )}
 
+          {/* ── Data Cleanup ──────────────────────────────────────────── */}
+          {tab === 'cleanup' && (
+            <CleanupTabContent password={password} />
+          )}
+
+          {/* ── Analytics ─────────────────────────────────────────────── */}
+          {tab === 'stats' && (
+            <StatsTab password={password} />
+          )}
+
         </div>
       </div>
 
@@ -309,25 +331,27 @@ export default function AdminCMSPage() {
 // ─── Sub-components ────────────────────────────────────────────────────────
 
 function TabButton({
-  active, onClick, label, count,
+  active, onClick, label, count, icon,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
   count: number | null;
+  icon?: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`px-5 py-3 font-black text-xs uppercase tracking-widest transition-colors border-b-2 -mb-0.5 ${
+      className={`flex items-center gap-1.5 px-5 py-3 font-black text-xs uppercase tracking-widest transition-colors border-b-2 -mb-0.5 whitespace-nowrap ${
         active
           ? 'text-[#00E5FF] border-[#00E5FF]'
           : 'text-neutral-500 border-transparent hover:text-neutral-300'
       }`}
     >
+      {icon && <span className="opacity-70">{icon}</span>}
       {label}
       {count !== null && (
-        <span className={`ml-2 px-1.5 py-0.5 text-[9px] font-black rounded-none ${
+        <span className={`ml-1 px-1.5 py-0.5 text-[9px] font-black rounded-none ${
           active ? 'bg-[#00E5FF]/10 text-[#00E5FF]' : 'bg-neutral-800 text-neutral-500'
         }`}>
           {count}
@@ -390,7 +414,6 @@ function EventTable({
                 i % 2 === 0 ? 'bg-[#111]' : 'bg-[#0d0d0d]'
               }`}
             >
-              {/* Poster thumbnail — larger so text is legible */}
               <td className="pl-3 pr-2 py-2 w-[108px]">
                 <div className="w-24 h-[128px] overflow-hidden border border-neutral-700 bg-neutral-900 shrink-0">
                   {event.image_url ? (

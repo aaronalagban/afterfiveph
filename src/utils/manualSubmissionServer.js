@@ -109,13 +109,13 @@ export async function approveAndScrapeEvent(pendingEventId) {
 
   if (insertError) throw new Error(`Live DB Insert Error: ${insertError.message}`);
 
-  await supabase.from('pending_events').update({ status: 'approved' }).eq('id', pendingEventId);
+  await supabase.from('pending_events').update({ status: 'APPROVED' }).eq('id', pendingEventId);
 
   return { success: true };
 }
 
 export async function rejectEvent(pendingEventId) {
   const supabase = getAdminClient();
-  await supabase.from('pending_events').update({ status: 'rejected' }).eq('id', pendingEventId);
+  await supabase.from('pending_events').update({ status: 'REJECTED' }).eq('id', pendingEventId);
   return { success: true };
 }

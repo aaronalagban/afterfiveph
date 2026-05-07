@@ -20,7 +20,7 @@ export async function POST(request) {
       const { data } = await supabase
         .from('pending_events')
         .select('*')
-        .eq('status', 'pending')
+        .eq('status', 'PENDING')
         .order('created_at', { ascending: true });
       return NextResponse.json({ queue: data });
     }

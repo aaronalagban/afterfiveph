@@ -36,7 +36,7 @@ export async function POST(request) {
       event_date: eventDate,
       club_name: clubName,
       ig_post_url: igPostUrl,
-      status: 'pending'
+      status: 'PENDING'
     });
 
     if (error) throw error;
