@@ -26,6 +26,7 @@
     "p-limit": "^7.3.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "resend": "^6.12.3",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {

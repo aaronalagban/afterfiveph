@@ -373,9 +373,7 @@ export async function generateLineupStory(
   darkMode = true
 ): Promise<Blob> {
   const DW = 360, DH = 640;
-  const COLS = 3, SIDE_PAD = 14, COL_GAP = 8, ROW_GAP = 8;
-  // (360 - 28 - 16) / 3 = 105.33 → 105
-  const CELL_W = Math.floor((DW - SIDE_PAD * 2 - COL_GAP * (COLS - 1)) / COLS);
+  const SIDE_PAD = 14, COL_GAP = 8, ROW_GAP = 8;
 
   const BG     = darkMode ? '#0B0B0D' : '#FFFFFF';
   const TEXT   = darkMode ? '#FFFFFF' : '#111111';
@@ -419,19 +417,38 @@ export async function generateLineupStory(
   const DATE_LINE_H  = 20;  // 9px font × 1.5 lh + 5px descender pad
   const TEXT_H = TEXT_TOP_PAD + NAME_LINE_H + NAME_TO_DATE + DATE_LINE_H; // 44
 
-  const MAX_IMG_H   = 280;
   const FOOTER_H    = 24;
-  const GRID_AREA_H = DH - GRID_TOP - FOOTER_H; // 533
+  const GRID_AREA_H = DH - GRID_TOP - FOOTER_H;
 
   const count = selectedEvents.length;
-  const rows  = count > 0 ? Math.ceil(count / COLS) : 0;
-  let imageH  = MAX_IMG_H;
-  if (rows > 0) {
-    const rawCellH = Math.floor((GRID_AREA_H - (rows - 1) * ROW_GAP) / rows);
-    imageH = Math.min(MAX_IMG_H, rawCellH - TEXT_H);
-    if (imageH < 50) imageH = 50;
-  }
-  const CELL_H = imageH + TEXT_H;
+
+  // Strict grid dimensions keyed to selection count
+  // n=1 → 1×1 | n=2 → 2×1 | n=3–4 → 2×2 | n=5–9 → 3×3
+  const cols   = count === 1 ? 1 : count <= 4 ? 2 : 3;
+  const rows   = count <= 2 ? 1 : count <= 4 ? 2 : 3;
+  const CELL_W = cols === 1
+    ? DW - SIDE_PAD * 2
+    : Math.floor((DW - SIDE_PAD * 2 - COL_GAP * (cols - 1)) / cols);
+
+  // Measure natural aspect ratio of each poster and use the median as imageH
+  const posterDims = await Promise.all(
+    posterUrls.map(url => url ? getImageDimensions(url) : Promise.resolve({ w: 1, h: 1 }))
+  );
+  const validHs = posterUrls
+    .map((url, i) => url && posterDims[i].w > 0
+      ? Math.round(CELL_W * posterDims[i].h / posterDims[i].w)
+      : null)
+    .filter((h): h is number => h !== null)
+    .sort((a, b) => a - b);
+  const medianH   = validHs.length > 0 ? validHs[Math.floor(validHs.length / 2)] : CELL_W;
+  const maxImageH = Math.floor((GRID_AREA_H - ROW_GAP * (rows - 1)) / rows) - TEXT_H;
+  const imageH    = Math.max(50, Math.min(maxImageH, medianH));
+
+  const CELL_H      = imageH + TEXT_H;
+  const gridBlockH  = rows * CELL_H + (rows - 1) * ROW_GAP;
+  const gridOffsetY = count > 0
+    ? Math.round((GRID_AREA_H - gridBlockH) / 2)
+    : 0;
 
   // ── Build DOM container ────────────────────────────────────────────────────
   const container = document.createElement('div');
@@ -477,7 +494,7 @@ export async function generateLineupStory(
   ].join(';');
 
   const labelTop = document.createElement('div');
-  labelTop.textContent = "YOUR WEEKLY LINEUP";
+  labelTop.textContent = "MY SCENE THIS WEEK";
   labelTop.style.cssText = [
     'font-size:10px',
     'font-weight:900',
@@ -492,7 +509,7 @@ export async function generateLineupStory(
     'font-size:12px',
     'font-weight:900',
     'letter-spacing:0.02em',
-    `color:${TEXT}`,
+    `color:${ACCENT}`,
     'margin-top:2px',
   ].join(';');
   headingEl.appendChild(labelBottom);
@@ -526,14 +543,14 @@ export async function generateLineupStory(
 
   // Poster grid
   for (let i = 0; i < count; i++) {
-    const row      = Math.floor(i / COLS);
-    const rowStart = row * COLS;
-    const rowCount = Math.min(COLS, count - rowStart);
+    const row      = Math.floor(i / cols);
+    const rowStart = row * cols;
+    const rowCount = Math.min(cols, count - rowStart);
     const colInRow = i - rowStart;
 
     const rowTotalW = rowCount * CELL_W + (rowCount - 1) * COL_GAP;
     const x = Math.round(SIDE_PAD + (DW - SIDE_PAD * 2 - rowTotalW) / 2 + colInRow * (CELL_W + COL_GAP));
-    const y = GRID_TOP + row * (CELL_H + ROW_GAP);
+    const y = GRID_TOP + gridOffsetY + row * (CELL_H + ROW_GAP);
 
     const event   = selectedEvents[i];
     const dataUrl = posterUrls[i];

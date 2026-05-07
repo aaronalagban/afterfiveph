@@ -213,15 +213,14 @@ function IntroStep({
         />
 
         <h1 className={`font-black text-4xl uppercase tracking-tighter leading-none mb-5 ${text}`}>
-          Your Week,<br />Curated.
+          My Scene<br />This Week.
         </h1>
 
         <p className={`font-mono text-sm leading-relaxed max-w-xs ${muted}`}>
-          We value the art of the poster{" "}
-          <span className="opacity-60">(and the sanity of graphic designers)</span>
-          . To keep your story looking like a masterpiece, select your{" "}
-          <strong className="font-bold text-[#F53D04]">Top 9</strong> must-attend
-          events for the week.
+          We value the art of the poster—and the sanity of graphic designers—so
+          select your{" "}
+          <strong className="font-bold text-[#F53D04]">top 9</strong>{" "}
+          events to feature.
         </p>
       </div>
 
