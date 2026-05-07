@@ -5,7 +5,7 @@ import './globals.css';
 
 // 1. Viewport settings (separate from metadata in Next.js 14+)
 export const viewport: Viewport = {
-  themeColor: '#000000', // Set this to your brand's primary color
+  themeColor: '#0B0B0D',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -13,6 +13,11 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://afterfive.ph'),
+  appleWebApp: {
+    capable: true,
+    title: 'AfterFivePH',
+    statusBarStyle: 'black-translucent',
+  },
   title: {
     default: 'AfterFivePH | Manila Nightlife Directory',
     template: '%s | AfterFivePH'

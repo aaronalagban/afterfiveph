@@ -19,7 +19,6 @@ export interface CommunityDirectoryItem {
   cover_image_url?: string;
 }
 
-const ACCESS_PASSWORD = process.env.NEXT_PUBLIC_COMMUNITIES_PASSWORD || "POBLACION";
 
 // --- INTERACTIVE 3D WAVE CANVAS ---
 const InteractiveWavyGrid = ({ darkMode }: { darkMode: boolean }) => {
@@ -171,13 +170,23 @@ export default function CommunitiesDirectory() {
     fetchCommunities();
   }, []);
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput.toUpperCase() === ACCESS_PASSWORD) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('comm_auth', 'true');
-      setPasswordError(false);
-    } else {
+    try {
+      const res = await fetch('/api/auth/communities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordInput }),
+      });
+      if (res.ok) {
+        setIsAuthenticated(true);
+        sessionStorage.setItem('comm_auth', 'true');
+        setPasswordError(false);
+      } else {
+        setPasswordError(true);
+        setPasswordInput("");
+      }
+    } catch {
       setPasswordError(true);
       setPasswordInput("");
     }
@@ -204,14 +213,14 @@ export default function CommunitiesDirectory() {
 
   if (loading) {
     return (
-      <div className={`h-screen w-full flex flex-col items-center justify-center font-sans ${darkMode ? 'bg-[#0B0B0D] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#111111]'}`}>
+      <div className={`h-[100dvh] w-full flex flex-col items-center justify-center font-sans ${darkMode ? 'bg-[#0B0B0D] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#111111]'}`}>
          <div className="font-mono text-xs uppercase tracking-widest animate-pulse">Loading Directory...</div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-full overflow-hidden font-sans transition-colors duration-300 relative bg-[#0B0B0D]">
+    <div className="h-[100dvh] w-full overflow-hidden font-sans transition-colors duration-300 relative bg-[#0B0B0D]">
       
       {/* 
         ========================================================================

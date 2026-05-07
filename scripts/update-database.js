@@ -47,7 +47,8 @@ const TARGET_ACCOUNTS = [
   "velveteen.house",
   "electric.sala",
   "nokal.manila",
-  "huai_ph"
+  "huai_ph",
+  "onokai.ph",
 ];
 
 const PRIORITY = {

@@ -24,9 +24,38 @@ const ACCENT = '#F53D04';
 const DAY_ABBR = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 const MAX_EVENTS = 30; // 6 rows × 5 cols
 
+// ── Theme system ──────────────────────────────────────────────────────────────
+
+export interface StoryTheme {
+  id: string;
+  label: string;
+  bg: string;
+  text: string;
+  muted: string;
+  cellBg: string;
+  sep: string;
+  accent: string;
+}
+
+export const STORY_THEMES: StoryTheme[] = [
+  { id: 'midnight', label: 'Midnight', bg: '#0B0B0D', text: '#FFFFFF', muted: '#6E6E73', cellBg: '#111111', sep: '#1A1A1E', accent: '#F53D04' },
+  { id: 'neon',     label: 'Neon Pulse', bg: '#07071A', text: '#E8E0FF', muted: '#5858A0', cellBg: '#0E0E2E', sep: '#1E1E4E', accent: '#A855F7' },
+  { id: 'brutalist',label: 'Brutalist',  bg: '#F5F5F5', text: '#000000', muted: '#666666', cellBg: '#E5E5E5', sep: '#000000', accent: '#F53D04' },
+  { id: 'sunset',   label: 'Sunset',    bg: '#0C0600', text: '#FFE8CC', muted: '#AA6633', cellBg: '#1A0C00', sep: '#3A1E00', accent: '#FF7700' },
+  { id: 'chrome',   label: 'Chrome',    bg: '#0A0A0A', text: '#C8C8C8', muted: '#484848', cellBg: '#181818', sep: '#282828', accent: '#C8C8C8' },
+];
+
+export type DateMode = 'range' | 'generic' | 'none';
+
+export interface StoryOptions {
+  theme: StoryTheme;
+  customTitle: string;
+  dateMode: DateMode;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getWeekBounds(): { mondayStr: string; sundayStr: string } {
+export function getWeekBounds(): { mondayStr: string; sundayStr: string } {
   const now = new Date();
   const day = now.getDay();
   const diffToMon = day === 0 ? -6 : 1 - day;
@@ -78,7 +107,7 @@ function getImageDimensions(dataUrl: string): Promise<{ w: number; h: number }> 
   });
 }
 
-function formatWeekRange(mondayStr: string, sundayStr: string): string {
+export function formatWeekRange(mondayStr: string, sundayStr: string): string {
   const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   const mon = new Date(`${mondayStr}T12:00:00`);
   const sun = new Date(`${sundayStr}T12:00:00`);
@@ -370,16 +399,12 @@ export async function generateWeeklyStory(
 
 export async function generateLineupStory(
   selectedEvents: StoryEvent[],
-  darkMode = true
+  options: StoryOptions,
 ): Promise<Blob> {
   const DW = 360, DH = 640;
   const SIDE_PAD = 14, COL_GAP = 8, ROW_GAP = 8;
 
-  const BG     = darkMode ? '#0B0B0D' : '#FFFFFF';
-  const TEXT   = darkMode ? '#FFFFFF' : '#111111';
-  const MUTED  = darkMode ? '#6E6E73' : '#8C8C92';
-  const CELL_BG = darkMode ? '#111111' : '#F0F0F3';
-  const SEP    = darkMode ? '#1A1A1E' : '#E5E5EA';
+  const { bg: BG, text: TEXT, muted: MUTED, cellBg: CELL_BG, sep: SEP, accent: ACCENT } = options.theme;
 
   // ── Pre-fetch all images as data URLs ─────────────────────────────────────
   const [logoDataUrl, ...posterUrls] = await Promise.all([
@@ -494,7 +519,7 @@ export async function generateLineupStory(
   ].join(';');
 
   const labelTop = document.createElement('div');
-  labelTop.textContent = "MY SCENE THIS WEEK";
+  labelTop.textContent = options.customTitle || "MY SCENE THIS WEEK";
   labelTop.style.cssText = [
     'font-size:10px',
     'font-weight:900',
@@ -503,16 +528,18 @@ export async function generateLineupStory(
   ].join(';');
   headingEl.appendChild(labelTop);
 
-  const labelBottom = document.createElement('div');
-  labelBottom.textContent = weekRangeLabel;
-  labelBottom.style.cssText = [
-    'font-size:12px',
-    'font-weight:900',
-    'letter-spacing:0.02em',
-    `color:${ACCENT}`,
-    'margin-top:2px',
-  ].join(';');
-  headingEl.appendChild(labelBottom);
+  if (options.dateMode !== 'none') {
+    const labelBottom = document.createElement('div');
+    labelBottom.textContent = options.dateMode === 'range' ? weekRangeLabel : "THIS WEEK";
+    labelBottom.style.cssText = [
+      'font-size:12px',
+      'font-weight:900',
+      'letter-spacing:0.02em',
+      `color:${ACCENT}`,
+      'margin-top:2px',
+    ].join(';');
+    headingEl.appendChild(labelBottom);
+  }
   
   container.appendChild(headingEl);
 

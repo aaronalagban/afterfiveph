@@ -108,6 +108,8 @@ export default function AfterFivePop() {
 
   useEffect(() => {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', darkMode ? '#0B0B0D' : '#F7F7F9');
   }, [darkMode]);
 
   useEffect(() => {
@@ -284,6 +286,10 @@ export default function AfterFivePop() {
         }
 
         @media (max-width: 767px) {
+          .mobile-safe-top {
+            padding-top: env(safe-area-inset-top, 0px);
+          }
+
           .mobile-safe-bottom {
             padding-bottom: calc(3rem + env(safe-area-inset-bottom, 0px));
           }
@@ -409,34 +415,37 @@ export default function AfterFivePop() {
       </nav>
 
       <main className="flex-1 w-full h-full relative overflow-hidden flex flex-col">
-        <div className={`md:hidden h-12 w-full border-b flex items-center justify-between px-4 z-50 shrink-0 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
-          <img src="/logo-1.png" alt="AfterFive Logo" className="h-5 w-auto cursor-pointer" onClick={() => setView("LIVE")} />
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setShowLineup(true)}
-              title="Share This Week"
-              className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#F53D04]' : 'text-[#8C8C92] hover:text-[#F53D04]'}`}
-            >
-              <Share2 size={15} />
-            </button>
-            <a
-              href="/submit"
-              className={`font-black text-[9px] uppercase tracking-widest border px-2.5 py-1 transition-colors flex items-center gap-1 ${darkMode ? 'border-[#2A2A2E] text-[#B3B3B8] hover:border-[#F53D04] hover:text-[#F53D04]' : 'border-[#E5E5EA] text-[#55555A] hover:border-[#F53D04] hover:text-[#F53D04]'}`}
-            >
-              <Plus size={9} />SUBMIT
-            </a>
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]'}`}
-            >
-              {darkMode ? <Sun size={15} /> : <Moon size={15} />}
-            </button>
-            <button
-              onClick={() => setShowInfo(true)}
-              className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]'}`}
-            >
-              <Info size={15} />
-            </button>
+        {/* Mobile header — outer div absorbs notch height via env(safe-area-inset-top) */}
+        <div className={`md:hidden w-full border-b z-50 shrink-0 mobile-safe-top ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+          <div className="h-12 flex items-center justify-between px-4">
+            <img src="/logo-1.png" alt="AfterFive Logo" className="h-5 w-auto cursor-pointer" onClick={() => setView("LIVE")} />
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowLineup(true)}
+                title="Share This Week"
+                className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#F53D04]' : 'text-[#8C8C92] hover:text-[#F53D04]'}`}
+              >
+                <Share2 size={15} />
+              </button>
+              <a
+                href="/submit"
+                className={`font-black text-[9px] uppercase tracking-widest border px-2.5 py-1 transition-colors flex items-center gap-1 ${darkMode ? 'border-[#2A2A2E] text-[#B3B3B8] hover:border-[#F53D04] hover:text-[#F53D04]' : 'border-[#E5E5EA] text-[#55555A] hover:border-[#F53D04] hover:text-[#F53D04]'}`}
+              >
+                <Plus size={9} />SUBMIT
+              </a>
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]'}`}
+              >
+                {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+              </button>
+              <button
+                onClick={() => setShowInfo(true)}
+                className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]'}`}
+              >
+                <Info size={15} />
+              </button>
+            </div>
           </div>
         </div>
 

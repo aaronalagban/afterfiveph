@@ -7,18 +7,18 @@ import { Event } from "@/types";
 export default function EventFeed({ events }: { events: Event[] }) {
   if (!events || events.length === 0) {
     return (
-      <div className="h-screen w-full bg-black text-white flex items-center justify-center font-mono">
+      <div className="h-[100dvh] w-full bg-black text-white flex items-center justify-center font-mono">
         No upcoming events yet. Run your scraper!
       </div>
     );
   }
 
   return (
-    <main className="h-screen w-full overflow-y-scroll snap-y snap-mandatory bg-black text-white">
+    <main className="h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory bg-black text-white">
       {events.map((event, index) => (
-        <section 
-          key={event.id || index} 
-          className="relative h-screen w-full snap-start snap-always flex flex-col justify-end p-8 md:p-16"
+        <section
+          key={event.id || index}
+          className="relative h-[100dvh] w-full snap-start snap-always flex flex-col justify-end p-8 md:p-16"
         >
           {/* Background Image */}
           <div 

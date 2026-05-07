@@ -24,10 +24,13 @@ export async function POST(request: Request) {
     const cleanUrl = igPostUrl.split('#')[0];
 
     const apifyRes = await fetch(
-      `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${apifyToken}`,
+      'https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apifyToken}`,
+        },
         body: JSON.stringify({
           directUrls: [cleanUrl],
           resultsType: 'details',

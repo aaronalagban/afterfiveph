@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server';
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from 'resend';
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request) {
@@ -35,18 +44,19 @@ export async function POST(request) {
     // Send notification email — fire-and-forget, non-blocking
     try {
       const djList = djsArray.length > 0 ? djsArray.join(', ') : 'N/A';
+      const safeUrl = encodeURI(igPostUrl);
       await resend.emails.send({
         from: 'AfterFivePH <onboarding@resend.dev>',
         to: 'collective.afterfive@gmail.com',
-        subject: `New Event Submission: ${eventName}`,
+        subject: `New Event Submission: ${escapeHtml(eventName)}`,
         html: `
           <h2>New Event Submission</h2>
           <table cellpadding="8" style="border-collapse:collapse;width:100%;font-family:monospace;">
-            <tr><td><strong>Event Name</strong></td><td>${eventName}</td></tr>
-            <tr><td><strong>Date</strong></td><td>${eventDate}</td></tr>
-            <tr><td><strong>Venue</strong></td><td>${clubName}</td></tr>
-            <tr><td><strong>DJs</strong></td><td>${djList}</td></tr>
-            <tr><td><strong>IG Post</strong></td><td><a href="${igPostUrl}">${igPostUrl}</a></td></tr>
+            <tr><td><strong>Event Name</strong></td><td>${escapeHtml(eventName)}</td></tr>
+            <tr><td><strong>Date</strong></td><td>${escapeHtml(eventDate)}</td></tr>
+            <tr><td><strong>Venue</strong></td><td>${escapeHtml(clubName)}</td></tr>
+            <tr><td><strong>DJs</strong></td><td>${escapeHtml(djList)}</td></tr>
+            <tr><td><strong>IG Post</strong></td><td><a href="${safeUrl}">${escapeHtml(igPostUrl)}</a></td></tr>
           </table>
         `,
       });

@@ -1,13 +1,15 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 
-/**
- * If `imageUrl` is already hosted in this project's Supabase storage, return
- * it unchanged. Otherwise download it and upload it to the `event-flyers`
- * bucket, then return the new public URL.
- *
- * This lets admins pick a raw Instagram CDN URL from the carousel grid and
- * have it permanently re-hosted before it gets written to the database.
- */
+const BLOCKED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
+
+function isInternalHost(hostname: string): boolean {
+  if (BLOCKED_HOSTNAMES.has(hostname)) return true;
+  if (/^10\./.test(hostname)) return true;
+  if (/^192\.168\./.test(hostname)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) return true;
+  return false;
+}
+
 export async function uploadImageIfNeeded(
   imageUrl: string,
   supabase: SupabaseClient,
@@ -15,9 +17,23 @@ export async function uploadImageIfNeeded(
 ): Promise<string> {
   const supabaseOrigin = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/$/, '');
 
-  // Already in our storage — nothing to do
   if (supabaseOrigin && imageUrl.startsWith(supabaseOrigin)) {
     return imageUrl;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(imageUrl);
+  } catch {
+    throw new Error('Invalid image URL');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only http/https image URLs allowed');
+  }
+
+  if (isInternalHost(parsed.hostname)) {
+    throw new Error('Internal image URLs not allowed');
   }
 
   const res = await fetch(imageUrl);
