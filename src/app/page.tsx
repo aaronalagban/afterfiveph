@@ -109,7 +109,7 @@ export default function AfterFivePop() {
   useEffect(() => {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', darkMode ? '#0B0B0D' : '#F7F7F9');
+    if (meta) meta.setAttribute('content', '#050505');
   }, [darkMode]);
 
   useEffect(() => {
