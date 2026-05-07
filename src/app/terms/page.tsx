@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 const LAST_UPDATED = "May 7, 2026";
-const CONTACT_EMAIL = "hello@afterfiveph.com";
+const CONTACT_EMAIL = "ollective.afterfive@gmail.com";
 
 export default function TermsPage() {
   return (
