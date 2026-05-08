@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code / local ai tooling
+.claude/
+.agents/
+skills-lock.json
+
+# local planning / spec docs
+FSD_STRUCTURE.txt
+FUNCTIONAL_SPEC.md
+
+# large binary assets (use git-lfs or external storage instead)
+*.traineddata
