@@ -49,6 +49,7 @@ const TARGET_ACCOUNTS = [
   "nokal.manila",
   "huai_ph",
   "onokai.ph",
+  "thebeefbar.ph"
 ];
 
 const PRIORITY = {

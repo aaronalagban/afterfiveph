@@ -29,7 +29,7 @@ export default function EventFeed({ events }: { events: Event[] }) {
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent z-0" />
 
           {/* Animated Text */}
-          <motion.div 
+          <motion.div
             className="relative z-10 mb-12" 
             initial={{ opacity: 0, y: 40 }} 
             whileInView={{ opacity: 1, y: 0 }} 

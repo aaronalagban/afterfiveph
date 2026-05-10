@@ -1,505 +1,342 @@
 "use client";
 
-import { useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
-import { RefreshCw, ExternalLink, Search, X, ImageOff, Trash2, Share2, BarChart2, Database } from 'lucide-react';
-import { EditEventModal, AdminEvent } from '@/components/admin/EditEventModal';
-import WeeklyLineupModal from '@/components/admin/WeeklyLineupModal';
-import { type StoryEvent } from '@/components/admin/generateWeeklyStory';
-import { CleanupTabContent } from '@/features/admin/data-cleanup/DataCleanupDashboard';
-import { StatsTab } from '@/features/admin/StatsTab';
+import { useReducer, useCallback, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  RefreshCw, BarChart2, Database, Inbox, Radio,
+  Share2, ChevronRight, Flag,
+} from 'lucide-react';
+import { ReviewQueue }         from '@/features/admin/ReviewQueue';
+import { LiveEventsTab }       from '@/features/admin/LiveEventsTab';
+import { CleanupTabContent }   from '@/features/admin/data-cleanup/DataCleanupDashboard';
+import { StatsTab }            from '@/features/admin/StatsTab';
+import { ReportsTab }          from '@/features/admin/ReportsTab';
+import WeeklyLineupModal       from '@/components/admin/WeeklyLineupModal';
+import { type StoryEvent }     from '@/components/admin/generateWeeklyStory';
+import { cmsReducer, initialCMSState } from '@/types/admin';
+import type { CMSTab, AdminPendingEvent, AdminLiveEvent } from '@/types/admin';
 
-type Tab = 'pending' | 'live' | 'cleanup' | 'stats';
+// ─── Toast system ─────────────────────────────────────────────────────────────
 
-export default function AdminCMSPage() {
-  const [password, setPassword] = useState('');
-  const [isAuth, setIsAuth] = useState(false);
+interface Toast { id: string; message: string; type: 'success' | 'error' }
 
-  const [tab, setTab] = useState<Tab>('pending');
+function useToasts() {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const add = useCallback((message: string, type: Toast['type'] = 'success') => {
+    const id = Math.random().toString(36).slice(2);
+    setToasts(t => [...t, { id, message, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500);
+  }, []);
+  return { toasts, add };
+}
 
-  const [queue, setQueue] = useState<AdminEvent[]>([]);
-  const [loadingQueue, setLoadingQueue] = useState(false);
+// ─── Page ──────────────────────────────────────────────────────────────────────
 
-  const [liveEvents, setLiveEvents] = useState<AdminEvent[]>([]);
-  const [loadingLive, setLoadingLive] = useState(false);
-  const [liveLoaded, setLiveLoaded] = useState(false);
-  const [liveSearch, setLiveSearch] = useState('');
-
-  const [editingEvent, setEditingEvent] = useState<AdminEvent | null>(null);
-  const [editingMode, setEditingMode] = useState<'pending' | 'live'>('pending');
-
+export default function AdminPage() {
+  const [state, dispatch] = useReducer(cmsReducer, initialCMSState);
+  const { toasts, add: addToast } = useToasts();
   const [showLineup, setShowLineup] = useState(false);
+  const [authInput,  setAuthInput]  = useState('');
+  const [authBusy,   setAuthBusy]   = useState(false);
+  const [authError,  setAuthError]  = useState('');
 
-  // ── fetchers ──────────────────────────────────────────────────────────────
+  // ── Data fetchers ────────────────────────────────────────────────────────────
 
-  const fetchQueue = async (pass: string) => {
-    setLoadingQueue(true);
+  const fetchQueue = useCallback(async (pass: string) => {
+    dispatch({ type: 'SET_LOADING', key: 'queue', value: true });
     try {
-      const res = await fetch('/api/admin-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pass, action: 'fetch' }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setQueue(data.queue ?? []);
-        setIsAuth(true);
-      } else {
-        alert('Wrong password!');
-      }
-    } finally {
-      setLoadingQueue(false);
-    }
-  };
-
-  const fetchLiveEvents = async (pass = password): Promise<AdminEvent[]> => {
-    setLoadingLive(true);
-    try {
-      const res = await fetch('/api/admin/live-events', {
+      const res  = await fetch('/api/admin/pending', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pass }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        const fetched: AdminEvent[] = data.events ?? [];
-        setLiveEvents(fetched);
-        setLiveLoaded(true);
-        return fetched;
-      }
-      return [];
-    } finally {
-      setLoadingLive(false);
-    }
-  };
-
-  // ── tab switching — lazy-loads live events on first open ──────────────────
-
-  const handleTabChange = (t: Tab) => {
-    setTab(t);
-    if (t === 'live' && !liveLoaded) fetchLiveEvents();
-  };
-
-  // ── modal success / delete ────────────────────────────────────────────────
-
-  const handleSuccess = (
-    id: string,
-    action: 'saved' | 'approved' | 'deleted',
-    updatedFields?: Partial<AdminEvent>
-  ) => {
-    if (action === 'approved' || action === 'deleted') {
-      if (editingMode === 'pending') setQueue(q => q.filter(e => e.id !== id));
-      else setLiveEvents(evts => evts.filter(e => e.id !== id));
-    } else if (action === 'saved' && updatedFields) {
-      if (editingMode === 'pending') {
-        setQueue(q => q.map(e => (e.id === id ? { ...e, ...updatedFields } : e)));
-      } else {
-        setLiveEvents(evts => evts.map(e => (e.id === id ? { ...e, ...updatedFields } : e)));
-      }
-    }
-  };
-
-  const handleTableDelete = async (event: AdminEvent, source: 'pending' | 'live') => {
-    if (!window.confirm(`Delete "${event.event_name}"?\n\nThis cannot be undone.`)) return;
-    const table = source === 'pending' ? 'pending_events' : 'events';
-    try {
-      const res = await fetch('/api/admin/delete-event', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, table, id: event.id }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        alert(`Delete failed: ${data.message}`);
-        return;
-      }
-      if (source === 'pending') setQueue(q => q.filter(e => e.id !== event.id));
-      else setLiveEvents(evts => evts.filter(e => e.id !== event.id));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? 'Failed');
+      dispatch({ type: 'LOAD_QUEUE', events: data.data as AdminPendingEvent[] });
+      return true;
     } catch {
-      alert('Delete failed. Check your connection.');
+      return false;
+    } finally {
+      dispatch({ type: 'SET_LOADING', key: 'queue', value: false });
     }
+  }, []);
+
+  const fetchLive = useCallback(async (pass: string) => {
+    dispatch({ type: 'SET_LOADING', key: 'live', value: true });
+    try {
+      const res  = await fetch('/api/admin/live-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pass }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? 'Failed');
+      dispatch({ type: 'LOAD_LIVE', events: (data.events ?? []) as AdminLiveEvent[] });
+    } finally {
+      dispatch({ type: 'SET_LOADING', key: 'live', value: false });
+    }
+  }, []);
+
+  // ── Auth ─────────────────────────────────────────────────────────────────────
+
+  const handleAuth = async () => {
+    if (!authInput.trim()) return;
+    setAuthBusy(true);
+    setAuthError('');
+    const ok = await fetchQueue(authInput);
+    if (ok) {
+      dispatch({ type: 'AUTH_SUCCESS', password: authInput, events: [] });
+      // AUTH_SUCCESS with empty array is fine — LOAD_QUEUE above already ran
+    } else {
+      setAuthError('Wrong password.');
+    }
+    setAuthBusy(false);
   };
 
-  const openEdit = (event: AdminEvent, mode: 'pending' | 'live') => {
-    setEditingEvent(event);
-    setEditingMode(mode);
+  // ── Tab change ───────────────────────────────────────────────────────────────
+
+  const handleTabChange = (tab: CMSTab) => {
+    dispatch({ type: 'SET_TAB', tab });
+    if (tab === 'live' && !state.liveLoaded) fetchLive(state.password);
   };
 
-  // ── filtered live events ──────────────────────────────────────────────────
+  // ── Refresh ──────────────────────────────────────────────────────────────────
 
-  const needle = liveSearch.toLowerCase();
-  const filteredLive = needle
-    ? liveEvents.filter(
-        e =>
-          e.event_name.toLowerCase().includes(needle) ||
-          e.club_name.toLowerCase().includes(needle) ||
-          (e.dj_name ?? '').toLowerCase().includes(needle) ||
-          (e.djs ?? []).some(d => d.toLowerCase().includes(needle))
-      )
-    : liveEvents;
+  const handleRefresh = () => {
+    if (state.activeTab === 'review') fetchQueue(state.password);
+    if (state.activeTab === 'live')   fetchLive(state.password);
+  };
 
-  // ── auth gate ─────────────────────────────────────────────────────────────
+  const isRefreshing = state.loading['queue'] || state.loading['live'];
+  const totalPending = state.scraperQueue.length + state.userQueue.length;
 
-  if (!isAuth) {
+  // ── Auth gate ─────────────────────────────────────────────────────────────────
+
+  if (!state.isAuth) {
     return (
-      <div className="min-h-screen bg-[#121212] flex items-center justify-center p-4">
-        <div className="w-full max-w-sm border-2 border-neutral-700 bg-black p-8 shadow-[4px_4px_0px_rgba(0,229,255,0.5)]">
-          <h1 className="text-white font-black text-2xl mb-6 uppercase">Admin CMS</h1>
-          <input
-            type="password"
-            placeholder="PASSWORD"
-            className="w-full bg-[#1a1a1a] border-2 border-neutral-700 text-white p-3 font-mono mb-4 text-center focus:border-[#00E5FF] outline-none"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && fetchQueue(password)}
-            autoFocus
-          />
-          <button
-            onClick={() => fetchQueue(password)}
-            disabled={loadingQueue}
-            className="w-full bg-[#00E5FF] text-black font-black p-3 uppercase hover:bg-[#76FF03] transition-colors disabled:opacity-50"
-          >
-            {loadingQueue ? 'LOADING...' : 'ENTER'}
-          </button>
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
+        {/* Ambient glow */}
+        <div className="fixed inset-0 pointer-events-none">
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#00E5FF]/3 rounded-full blur-[120px]" />
+        </div>
+
+        <div className="w-full max-w-sm relative">
+          <div className="mb-8 text-center">
+            <div className="inline-flex items-center gap-2 mb-3">
+              <div className="w-2 h-2 rounded-full bg-[#00E5FF] animate-pulse" />
+              <span className="font-mono text-[10px] text-neutral-500 uppercase tracking-[0.3em]">AfterFive CMS</span>
+            </div>
+            <h1 className="font-black text-3xl text-white uppercase tracking-tighter">
+              Admin Access
+            </h1>
+          </div>
+
+          <div className="bg-[#111] border border-neutral-800 p-6 shadow-[0_0_60px_rgba(0,229,255,0.04)]">
+            <input
+              type="password"
+              placeholder="ENTER PASSWORD"
+              className="w-full bg-[#0a0a0a] border border-neutral-700 text-white p-3 font-mono text-sm text-center focus:border-[#00E5FF] focus:outline-none placeholder:text-neutral-600 transition-colors mb-3"
+              value={authInput}
+              onChange={e => { setAuthInput(e.target.value); setAuthError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleAuth()}
+              autoFocus
+            />
+            {authError && (
+              <p className="text-[#FF3D00] font-mono text-xs text-center mb-3">{authError}</p>
+            )}
+            <button
+              onClick={handleAuth}
+              disabled={authBusy || !authInput.trim()}
+              className="w-full bg-[#00E5FF] text-black font-black p-3 uppercase text-sm hover:bg-white disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+            >
+              {authBusy ? <RefreshCw size={14} className="animate-spin" /> : <ChevronRight size={14} />}
+              {authBusy ? 'Authenticating…' : 'Enter'}
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  // ── dashboard ─────────────────────────────────────────────────────────────
+  // ── Dashboard ─────────────────────────────────────────────────────────────────
 
-  const isLoading = tab === 'pending' ? loadingQueue : tab === 'live' ? loadingLive : false;
+  const tabs: { id: CMSTab; label: string; icon: React.ReactNode; count?: number }[] = [
+    { id: 'review',  label: 'Review',    icon: <Inbox size={13} />,    count: totalPending  },
+    { id: 'live',    label: 'Live',      icon: <Radio size={13} />,    count: state.liveLoaded ? state.liveEvents.length : undefined },
+    { id: 'cleanup', label: 'Cleanup',   icon: <Database size={13} />  },
+    { id: 'stats',   label: 'Analytics', icon: <BarChart2 size={13} /> },
+    { id: 'reports', label: 'Reports',   icon: <Flag size={13} />      },
+  ];
 
   return (
     <>
-      <div className="min-h-screen bg-[#121212] text-white p-4 md:p-8">
-        <div className="max-w-6xl mx-auto">
+      <div className="min-h-screen bg-[#0a0a0a] text-white">
 
-          {/* Page header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <h1 className="font-black text-3xl uppercase tracking-tighter text-[#00E5FF]">
-              Admin CMS
-            </h1>
-            <div className="flex items-center gap-2 self-start sm:self-auto">
+        {/* ── Top accent line ─────────────────────────────────────── */}
+        <div className="h-px w-full" style={{
+          background: 'linear-gradient(90deg, #00E5FF 0%, #76FF03 50%, transparent 100%)',
+        }} />
+
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-5">
+
+          {/* ── Header ────────────────────────────────────────────── */}
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-4">
+              <div>
+                <h1 className="font-black text-2xl uppercase tracking-tighter text-white leading-none">
+                  AfterFive<span className="text-[#00E5FF]">.</span>CMS
+                </h1>
+                <p className="font-mono text-[10px] text-neutral-600 mt-0.5 uppercase tracking-widest">
+                  Event moderation &amp; data management
+                </p>
+              </div>
+              {totalPending > 0 && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#F59E0B]/10 border border-[#F59E0B]/30">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] animate-pulse" />
+                  <span className="font-mono text-[10px] text-[#F59E0B] uppercase tracking-widest">
+                    {totalPending} pending
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
               <button
-                onClick={async () => {
-                  if (!liveLoaded) await fetchLiveEvents();
+                onClick={() => {
+                  if (!state.liveLoaded) fetchLive(state.password);
                   setShowLineup(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-[#F53D04] text-white font-black text-xs uppercase tracking-widest hover:bg-[#FF5520] transition-colors"
-                title="Curate and share this week's lineup as an Instagram Story"
+                className="flex items-center gap-2 px-3 py-2 bg-[#F53D04] text-white font-black text-[10px] uppercase tracking-widest hover:bg-[#FF5520] transition-colors"
               >
-                <Share2 size={13} />
-                Weekly Story
+                <Share2 size={12} />
+                <span className="hidden sm:inline">Weekly Story</span>
               </button>
-              {(tab === 'pending' || tab === 'live') && (
+
+              {(state.activeTab === 'review' || state.activeTab === 'live') && (
                 <button
-                  onClick={() => tab === 'pending' ? fetchQueue(password) : fetchLiveEvents()}
-                  disabled={isLoading}
-                  className="flex items-center gap-2 px-4 py-2 border-2 border-neutral-700 font-mono text-sm hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-2 px-3 py-2 border border-neutral-800 text-neutral-400 font-mono text-[10px] uppercase hover:bg-neutral-900 hover:text-white disabled:opacity-50 transition-colors"
                 >
-                  <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
-                  Refresh
+                  <RefreshCw size={11} className={isRefreshing ? 'animate-spin' : ''} />
+                  <span className="hidden sm:inline">Refresh</span>
                 </button>
               )}
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="flex border-b-2 border-neutral-800 mb-6 overflow-x-auto">
-            <TabButton
-              active={tab === 'pending'}
-              onClick={() => handleTabChange('pending')}
-              label="Pending Queue"
-              count={queue.length}
-            />
-            <TabButton
-              active={tab === 'live'}
-              onClick={() => handleTabChange('live')}
-              label="Live Events"
-              count={liveLoaded ? liveEvents.length : null}
-            />
-            <TabButton
-              active={tab === 'cleanup'}
-              onClick={() => handleTabChange('cleanup')}
-              label="Data Cleanup"
-              count={null}
-              icon={<Database size={11} />}
-            />
-            <TabButton
-              active={tab === 'stats'}
-              onClick={() => handleTabChange('stats')}
-              label="Analytics"
-              count={null}
-              icon={<BarChart2 size={11} />}
-            />
+          {/* ── Tab bar ───────────────────────────────────────────── */}
+          <div className="flex items-end gap-0 border-b border-neutral-800 mb-6">
+            {tabs.map(tab => {
+              const active = state.activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`flex items-center gap-2 px-5 py-3 font-black text-xs uppercase tracking-widest transition-colors border-b-2 -mb-px whitespace-nowrap ${
+                    active
+                      ? 'text-[#00E5FF] border-[#00E5FF]'
+                      : 'text-neutral-500 border-transparent hover:text-neutral-300 hover:border-neutral-700'
+                  }`}
+                >
+                  <span className={active ? 'opacity-100' : 'opacity-50'}>{tab.icon}</span>
+                  {tab.label}
+                  {tab.count !== undefined && (
+                    <span className={`px-1.5 py-0.5 text-[9px] font-black rounded-none ${
+                      active ? 'bg-[#00E5FF]/10 text-[#00E5FF]' : 'bg-neutral-900 text-neutral-600'
+                    }`}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          {/* ── Pending Queue ─────────────────────────────────────────── */}
-          {tab === 'pending' && (
-            <EventTable
-              events={queue}
-              loading={loadingQueue}
-              emptyMessage="Queue is empty. Go touch grass."
-              showSource
-              onEdit={e => openEdit(e, 'pending')}
-              onDelete={e => handleTableDelete(e, 'pending')}
-            />
-          )}
-
-          {/* ── Live Events ───────────────────────────────────────────── */}
-          {tab === 'live' && (
-            <div className="flex flex-col gap-4">
-              <div className="relative max-w-sm">
-                <Search
-                  size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none"
+          {/* ── Tab Content ───────────────────────────────────────── */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={state.activeTab}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+            >
+              {state.activeTab === 'review' && (
+                <ReviewQueue
+                  scraperQueue={state.scraperQueue}
+                  userQueue={state.userQueue}
+                  subTab={state.reviewSubTab}
+                  expandedId={state.expandedId}
+                  password={state.password}
+                  dispatch={dispatch}
                 />
-                <input
-                  type="text"
-                  placeholder="Search by event, DJ or club..."
-                  value={liveSearch}
-                  onChange={e => setLiveSearch(e.target.value)}
-                  className="w-full bg-[#1a1a1a] border-2 border-neutral-700 text-white pl-9 pr-9 py-2 font-mono text-sm focus:border-[#00E5FF] outline-none placeholder:text-neutral-600"
-                />
-                {liveSearch && (
-                  <button
-                    onClick={() => setLiveSearch('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
+              )}
 
-              <EventTable
-                events={filteredLive}
-                loading={loadingLive}
-                emptyMessage={
-                  !liveLoaded
-                    ? 'Loading...'
-                    : liveSearch
-                    ? 'No events match your search.'
-                    : 'No upcoming live events found.'
-                }
-                showSource={false}
-                onEdit={e => openEdit(e, 'live')}
-                onDelete={e => handleTableDelete(e, 'live')}
-              />
-            </div>
-          )}
+              {state.activeTab === 'live' && (
+                state.loading['live'] && !state.liveLoaded ? (
+                  <div className="py-24 text-center font-mono text-xs text-neutral-600 uppercase animate-pulse tracking-widest">
+                    Loading live events…
+                  </div>
+                ) : (
+                  <LiveEventsTab
+                    events={state.liveEvents}
+                    expandedId={state.expandedId}
+                    password={state.password}
+                    dispatch={dispatch}
+                  />
+                )
+              )}
 
-          {/* ── Data Cleanup ──────────────────────────────────────────── */}
-          {tab === 'cleanup' && (
-            <CleanupTabContent password={password} />
-          )}
+              {state.activeTab === 'cleanup' && (
+                <CleanupTabContent password={state.password} />
+              )}
 
-          {/* ── Analytics ─────────────────────────────────────────────── */}
-          {tab === 'stats' && (
-            <StatsTab password={password} />
-          )}
+              {state.activeTab === 'stats' && (
+                <StatsTab password={state.password} />
+              )}
+
+              {state.activeTab === 'reports' && (
+                <ReportsTab password={state.password} />
+              )}
+            </motion.div>
+          </AnimatePresence>
 
         </div>
       </div>
 
-      {editingEvent && (
-        <EditEventModal
-          event={editingEvent}
-          password={password}
-          mode={editingMode}
-          onClose={() => setEditingEvent(null)}
-          onSuccess={(id, action, updatedFields) => {
-            handleSuccess(id, action, updatedFields);
-            setEditingEvent(null);
-          }}
-        />
-      )}
-
+      {/* ── Weekly Story Modal ─────────────────────────────────── */}
       <AnimatePresence>
         {showLineup && (
           <WeeklyLineupModal
-            events={liveEvents as StoryEvent[]}
-            darkMode={true}
+            events={state.liveEvents as unknown as StoryEvent[]}
+            darkMode
             onClose={() => setShowLineup(false)}
           />
         )}
       </AnimatePresence>
-    </>
-  );
-}
 
-// ─── Sub-components ────────────────────────────────────────────────────────
-
-function TabButton({
-  active, onClick, label, count, icon,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  count: number | null;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-1.5 px-5 py-3 font-black text-xs uppercase tracking-widest transition-colors border-b-2 -mb-0.5 whitespace-nowrap ${
-        active
-          ? 'text-[#00E5FF] border-[#00E5FF]'
-          : 'text-neutral-500 border-transparent hover:text-neutral-300'
-      }`}
-    >
-      {icon && <span className="opacity-70">{icon}</span>}
-      {label}
-      {count !== null && (
-        <span className={`ml-1 px-1.5 py-0.5 text-[9px] font-black rounded-none ${
-          active ? 'bg-[#00E5FF]/10 text-[#00E5FF]' : 'bg-neutral-800 text-neutral-500'
-        }`}>
-          {count}
-        </span>
-      )}
-    </button>
-  );
-}
-
-function EventTable({
-  events, loading, emptyMessage, showSource, onEdit, onDelete,
-}: {
-  events: AdminEvent[];
-  loading: boolean;
-  emptyMessage: string;
-  showSource: boolean;
-  onEdit: (e: AdminEvent) => void;
-  onDelete: (e: AdminEvent) => void;
-}) {
-  if (loading && events.length === 0) {
-    return (
-      <div className="text-center py-16 font-mono text-neutral-500 text-sm animate-pulse">
-        Loading...
-      </div>
-    );
-  }
-
-  if (events.length === 0) {
-    return (
-      <div className="text-center py-24 font-mono">
-        <p className="text-neutral-400 text-base">{emptyMessage}</p>
-      </div>
-    );
-  }
-
-  const cols = showSource
-    ? ['Poster', 'Event', 'DJs', 'Date', 'Venue', 'Source', '']
-    : ['Poster', 'Event', 'DJs', 'Date', 'Venue', ''];
-
-  return (
-    <div className="overflow-x-auto border-2 border-neutral-700">
-      <table className="w-full min-w-[860px] border-collapse">
-        <thead>
-          <tr className="bg-neutral-900 border-b border-neutral-700">
-            {cols.map(h => (
-              <th
-                key={h}
-                className="text-left px-4 py-2 text-[10px] font-mono text-neutral-500 uppercase tracking-widest font-normal whitespace-nowrap"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {events.map((event, i) => (
-            <tr
-              key={event.id}
-              className={`border-b border-neutral-800 last:border-0 ${
-                i % 2 === 0 ? 'bg-[#111]' : 'bg-[#0d0d0d]'
+      {/* ── Toast Stack ───────────────────────────────────────── */}
+      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 items-end pointer-events-none">
+        <AnimatePresence mode="popLayout">
+          {toasts.map(t => (
+            <motion.div
+              key={t.id}
+              initial={{ x: 48, opacity: 0 }}
+              animate={{ x: 0,  opacity: 1 }}
+              exit={{ x: 48,  opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className={`flex items-center gap-2.5 px-4 py-3 border font-mono text-xs uppercase tracking-widest pointer-events-auto max-w-xs ${
+                t.type === 'success'
+                  ? 'bg-[#0a0a0a] border-[#76FF03] text-[#76FF03]'
+                  : 'bg-[#0a0a0a] border-[#FF3D00] text-[#FF3D00]'
               }`}
             >
-              <td className="pl-3 pr-2 py-2 w-[108px]">
-                <div className="w-24 h-[128px] overflow-hidden border border-neutral-700 bg-neutral-900 shrink-0">
-                  {event.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={event.image_url}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-neutral-700">
-                      <ImageOff size={18} />
-                    </div>
-                  )}
-                </div>
-              </td>
-
-              <td className="px-4 py-2 max-w-[200px]">
-                <p className="font-black text-sm text-white truncate">{event.event_name}</p>
-              </td>
-              <td className="px-4 py-2 max-w-[160px]">
-                <p className="font-mono text-xs text-neutral-400 truncate">
-                  {event.dj_name || event.djs?.join(', ') || '—'}
-                </p>
-              </td>
-              <td className="px-4 py-2 whitespace-nowrap">
-                <span className="font-mono text-xs text-neutral-300">{event.event_date}</span>
-              </td>
-              <td className="px-4 py-2 max-w-[160px]">
-                <span className="font-mono text-xs text-neutral-300 truncate block">
-                  {event.club_name}
-                </span>
-              </td>
-              {showSource && (
-                <td className="px-4 py-2 whitespace-nowrap">
-                  <SourceBadge source={event.source} />
-                </td>
-              )}
-              <td className="px-4 py-2 whitespace-nowrap">
-                <div className="flex items-center gap-2">
-                  {event.ig_post_url && (
-                    <a
-                      href={event.ig_post_url.split('#')[0]}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-1.5 border border-neutral-700 text-neutral-500 hover:text-white hover:border-neutral-500 transition-colors"
-                      title="View IG Post"
-                    >
-                      <ExternalLink size={12} />
-                    </a>
-                  )}
-                  <button
-                    onClick={() => onEdit(event)}
-                    className="px-3 py-1.5 border-2 border-neutral-600 text-xs font-black uppercase hover:border-[#00E5FF] hover:text-[#00E5FF] transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onDelete(event)}
-                    className="p-1.5 border border-neutral-700 text-neutral-600 hover:border-[#FF3D00] hover:text-[#FF3D00] transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </td>
-            </tr>
+              {t.message}
+            </motion.div>
           ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function SourceBadge({ source }: { source: string | null }) {
-  if (source === 'scraper') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-black font-mono uppercase bg-blue-950 border border-blue-700 text-blue-300">
-        🤖 AI
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-black font-mono uppercase bg-green-950 border border-green-700 text-green-300">
-      👤 User
-    </span>
+        </AnimatePresence>
+      </div>
+    </>
   );
 }

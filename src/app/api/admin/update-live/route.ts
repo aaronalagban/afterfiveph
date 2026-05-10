@@ -19,6 +19,8 @@ const ALLOWED_FIELDS = new Set([
   'ig_post_url',
   'djs',
   'carousel_images',
+  'starts_at',
+  'ends_at',
 ]);
 
 export async function PATCH(request: Request) {

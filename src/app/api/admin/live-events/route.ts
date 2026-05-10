@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
     const { data, error } = await supabase
       .from('events')
-      .select('id, event_name, dj_name, club_name, city, event_date, image_url, ig_post_url, djs')
+      .select('id, event_name, dj_name, club_name, city, event_date, image_url, ig_post_url, djs, carousel_images, starts_at, ends_at, confidence_score, source_username, source_platform')
       .gte('event_date', today)
       .order('event_date', { ascending: true });
 

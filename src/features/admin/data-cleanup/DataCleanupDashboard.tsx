@@ -4,12 +4,13 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   RefreshCw, Check, X, AlertTriangle, ImageOff,
-  Instagram, ChevronDown, Search,
+  Instagram, ChevronDown, Search, Trash2, Users, MapPin,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type CleanupTab = 'artists' | 'venues' | 'events';
+type CleanupTab = 'artists' | 'venues' | 'events' | 'duplicates';
+type SimilarityReason = 'case_duplicate' | 'substring_match' | 'trigram_similar';
 type ArtistSort = 'events_desc' | 'events_asc' | 'az' | 'za' | 'duplicates';
 type VenueSort  = 'events_desc' | 'events_asc' | 'az' | 'za' | 'recent' | 'duplicates';
 type EventSort  = 'date_asc'    | 'date_desc'   | 'az';
@@ -53,6 +54,20 @@ interface ToastItem {
   type: 'success' | 'error';
 }
 
+interface SuggestionMember {
+  id: string;
+  name: string;
+  secondary?: string | null;
+}
+
+interface SuggestionGroup {
+  id: string;
+  type: 'artist' | 'venue';
+  reason: SimilarityReason;
+  confidence: number;
+  members: SuggestionMember[];
+}
+
 // ─── API helper ───────────────────────────────────────────────────────────────
 
 async function api(password: string, action: string, payload?: object) {
@@ -83,20 +98,34 @@ function dupeScore(name: string, allNames: string[]): number {
 // ─── CleanupTabContent — embeddable (named export) ────────────────────────────
 
 export function CleanupTabContent({ password }: { password: string }) {
-  const [tab,        setTab]       = useState<CleanupTab>('artists');
-  const [artists,    setArtists]   = useState<ArtistTask[]>([]);
-  const [venues,     setVenues]    = useState<VenueTask[]>([]);
-  const [orphaned,   setOrphaned]  = useState<OrphanedEvent[]>([]);
-  const [allVenues,  setAllVenues]  = useState<VenueOption[]>([]);
-  const [allArtists, setAllArtists] = useState<ArtistOption[]>([]);
-  const [loadingTab, setLoadingTab] = useState(false);
-  const [toasts,     setToasts]    = useState<ToastItem[]>([]);
+  const [tab,           setTab]          = useState<CleanupTab>('artists');
+  const [artists,       setArtists]      = useState<ArtistTask[]>([]);
+  const [venues,        setVenues]       = useState<VenueTask[]>([]);
+  const [orphaned,      setOrphaned]     = useState<OrphanedEvent[]>([]);
+  const [suggestions,   setSuggestions]  = useState<SuggestionGroup[]>([]);
+  const [allVenues,     setAllVenues]    = useState<VenueOption[]>([]);
+  const [allArtists,    setAllArtists]   = useState<ArtistOption[]>([]);
+  const [loadingTab,    setLoadingTab]   = useState(false);
+  const [loadingDupes,  setLoadingDupes] = useState(false);
+  const [toasts,        setToasts]       = useState<ToastItem[]>([]);
 
   const addToast = useCallback((message: string, type: ToastItem['type']) => {
     const id = Math.random().toString(36).slice(2);
     setToasts(t => [...t, { id, message, type }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3500);
   }, []);
+
+  const loadSuggestions = useCallback(async () => {
+    setLoadingDupes(true);
+    try {
+      const { data } = await api(password, 'fetch_suggestions');
+      setSuggestions(data ?? []);
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Failed to load suggestions', 'error');
+    } finally {
+      setLoadingDupes(false);
+    }
+  }, [password]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = useCallback(async (t: CleanupTab) => {
     setLoadingTab(true);
@@ -125,10 +154,16 @@ export function CleanupTabContent({ password }: { password: string }) {
 
   const switchTab = (t: CleanupTab) => {
     setTab(t);
-    loadData(t);
+    if (t === 'duplicates') loadSuggestions();
+    else loadData(t);
   };
 
-  const tabCount = { artists: artists.length, venues: venues.length, events: orphaned.length };
+  const tabCount = {
+    artists: artists.length,
+    venues: venues.length,
+    events: orphaned.length,
+    duplicates: suggestions.length,
+  };
 
   return (
     <>
@@ -136,22 +171,29 @@ export function CleanupTabContent({ password }: { password: string }) {
         {/* Sub-tab bar + refresh */}
         <div className="flex items-center justify-between border-b-2 border-neutral-800 mb-6">
           <div className="flex">
-            {(['artists', 'venues', 'events'] as CleanupTab[]).map(t => (
-              <CleanupTabButton
-                key={t}
-                active={tab === t}
-                onClick={() => switchTab(t)}
-                label={t === 'events' ? 'Orphaned Events' : t}
-                count={tabCount[t]}
-              />
-            ))}
+            {(
+            [
+              { id: 'artists',    label: 'Artists' },
+              { id: 'venues',     label: 'Venues' },
+              { id: 'events',     label: 'Orphaned Events' },
+              { id: 'duplicates', label: 'Duplicates' },
+            ] as { id: CleanupTab; label: string }[]
+          ).map(t => (
+            <CleanupTabButton
+              key={t.id}
+              active={tab === t.id}
+              onClick={() => switchTab(t.id)}
+              label={t.label}
+              count={tabCount[t.id]}
+            />
+          ))}
           </div>
           <button
-            onClick={() => loadData(tab)}
-            disabled={loadingTab}
+            onClick={() => tab === 'duplicates' ? loadSuggestions() : loadData(tab)}
+            disabled={tab === 'duplicates' ? loadingDupes : loadingTab}
             className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-700 font-mono text-[10px] uppercase hover:bg-neutral-800 disabled:opacity-50 transition-colors text-neutral-400 mb-0.5"
           >
-            <RefreshCw size={10} className={loadingTab ? 'animate-spin' : ''} />
+            <RefreshCw size={10} className={(tab === 'duplicates' ? loadingDupes : loadingTab) ? 'animate-spin' : ''} />
             Refresh
           </button>
         </div>
@@ -192,6 +234,17 @@ export function CleanupTabContent({ password }: { password: string }) {
                 allArtists={allArtists}
                 onRemove={id => setOrphaned(o => o.filter(x => x.id !== id))}
                 onRestore={item => setOrphaned(o => [item, ...o])}
+                onToast={addToast}
+              />
+            </motion.div>
+          )}
+          {tab === 'duplicates' && (
+            <motion.div key="duplicates" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <SuggestionsTab
+                items={suggestions}
+                loading={loadingDupes}
+                password={password}
+                onResolved={id => setSuggestions(s => s.filter(g => g.id !== id))}
                 onToast={addToast}
               />
             </motion.div>
@@ -270,6 +323,281 @@ export default function DataCleanupDashboard() {
         </div>
         <CleanupTabContent password={password} />
       </div>
+    </div>
+  );
+}
+
+// ─── Tab 0: Duplicates ────────────────────────────────────────────────────────
+
+function ReasonBadge({ reason }: { reason: SimilarityReason }) {
+  const MAP: Record<SimilarityReason, { label: string; cls: string }> = {
+    case_duplicate: { label: 'Case Duplicate', cls: 'text-[#FF3D00] border-[#FF3D00]/30 bg-[#FF3D00]/5' },
+    substring_match:{ label: 'Name Overlap',   cls: 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/5' },
+    trigram_similar:{ label: 'Similar Name',   cls: 'text-[#00E5FF] border-[#00E5FF]/30 bg-[#00E5FF]/5' },
+  };
+  const { label, cls } = MAP[reason];
+  return (
+    <span className={`font-mono text-[9px] uppercase tracking-widest border px-2 py-0.5 ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
+function SuggestionCard({
+  group, password, onResolved, onToast,
+}: {
+  group: SuggestionGroup;
+  password: string;
+  onResolved: (id: string) => void;
+  onToast: (msg: string, type: ToastItem['type']) => void;
+}) {
+  const [primaryId, setPrimaryId] = useState(group.members[0].id);
+  const [mode, setMode]           = useState<'idle' | 'merging' | 'confirm-delete'>('idle');
+  const [busy, setBusy]           = useState(false);
+
+  async function call(action: 'merge_entities' | 'delete_entities' | 'dismiss_suggestion') {
+    setBusy(true);
+    try {
+      await api(password, action, {
+        type: group.type,
+        primaryId: action === 'merge_entities' ? primaryId : undefined,
+        memberIds: group.members.map(m => m.id),
+      });
+      onToast(
+        action === 'merge_entities'   ? `Merged ${group.members.length - 1} duplicate${group.members.length > 2 ? 's' : ''}` :
+        action === 'delete_entities'  ? `Deleted ${group.members.length} records` :
+        'Group dismissed',
+        'success'
+      );
+      onResolved(group.id);
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : 'Request failed', 'error');
+      setBusy(false);
+    }
+  }
+
+  const Icon = group.type === 'artist' ? Users : MapPin;
+  const typeColor = group.type === 'artist' ? 'text-[#76FF03]' : 'text-[#00E5FF]';
+
+  const reasonDesc: Record<SimilarityReason, string> = {
+    case_duplicate: 'Identical names, different capitalisation:',
+    substring_match: 'One name contains the other — likely the same entity:',
+    trigram_similar: 'High character similarity — possible duplicates:',
+  };
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+      className="border border-neutral-800 bg-[#111] hover:border-neutral-700 transition-colors"
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 pt-3.5 pb-3 border-b border-neutral-800/60">
+        <span className={`flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest ${typeColor}`}>
+          <Icon size={11} />{group.type}
+        </span>
+        <ReasonBadge reason={group.reason} />
+        <span className="font-mono text-[9px] text-neutral-500">
+          {Math.round(group.confidence * 100)}% match
+        </span>
+        <span className="ml-auto font-mono text-[9px] text-neutral-600">
+          {group.members.length} records
+        </span>
+      </div>
+
+      {/* Member list */}
+      <div className="px-4 py-3 space-y-1.5">
+        <p className="font-mono text-[10px] text-neutral-500 mb-3 uppercase tracking-wider">
+          {reasonDesc[group.reason]}
+        </p>
+        {group.members.map(m => (
+          <button
+            key={m.id}
+            onClick={() => mode === 'merging' && setPrimaryId(m.id)}
+            disabled={mode !== 'merging'}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 border text-left transition-colors disabled:cursor-default ${
+              mode === 'merging'
+                ? primaryId === m.id
+                  ? 'border-[#76FF03]/60 bg-[#76FF03]/5'
+                  : 'border-neutral-700 hover:border-neutral-500'
+                : 'border-neutral-800'
+            }`}
+          >
+            {mode === 'merging' && (
+              <div className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 flex items-center justify-center ${
+                primaryId === m.id ? 'border-[#76FF03] bg-[#76FF03]' : 'border-neutral-600'
+              }`}>
+                {primaryId === m.id && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
+              </div>
+            )}
+            <span className="text-white font-black text-sm flex-1 leading-none">
+              {m.name}
+            </span>
+            {m.secondary && (
+              <span className="font-mono text-[10px] text-neutral-500">{m.secondary}</span>
+            )}
+            {mode === 'merging' && primaryId === m.id && (
+              <span className="font-mono text-[9px] uppercase tracking-widest text-[#76FF03]">Primary</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Actions */}
+      <div className="px-4 pb-4">
+        {mode === 'idle' && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setMode('merging')}
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#76FF03]/10 border border-[#76FF03]/30 text-[#76FF03] font-black text-[10px] uppercase tracking-widest hover:bg-[#76FF03]/20 transition-colors"
+            >
+              <Check size={11} /> Merge
+            </button>
+            <button
+              onClick={() => call('dismiss_suggestion')}
+              disabled={busy}
+              className="flex items-center gap-1.5 px-3 py-2 border border-neutral-800 text-neutral-400 font-mono text-[10px] uppercase tracking-widest hover:border-neutral-600 hover:text-neutral-300 disabled:opacity-50 transition-colors"
+            >
+              <X size={11} /> Keep Separate
+            </button>
+            <button
+              onClick={() => setMode('confirm-delete')}
+              className="flex items-center gap-1.5 px-3 py-2 border border-[#FF3D00]/20 text-[#FF3D00]/60 font-mono text-[10px] uppercase tracking-widest hover:border-[#FF3D00]/50 hover:text-[#FF3D00] transition-colors"
+            >
+              <Trash2 size={11} /> Delete All
+            </button>
+          </div>
+        )}
+
+        {mode === 'merging' && (
+          <div className="space-y-2">
+            <p className="font-mono text-[10px] text-neutral-500">
+              Select the <span className="text-white">canonical record</span> above.
+              Duplicates will be deleted and their event links transferred.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => call('merge_entities')}
+                disabled={busy}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#76FF03] text-black font-black text-[10px] uppercase tracking-widest hover:bg-white disabled:opacity-50 transition-colors"
+              >
+                {busy ? <RefreshCw size={11} className="animate-spin" /> : <Check size={11} />}
+                Apply Merge
+              </button>
+              <button
+                onClick={() => setMode('idle')}
+                disabled={busy}
+                className="flex items-center gap-1.5 px-3 py-2 border border-neutral-800 text-neutral-400 font-mono text-[10px] uppercase tracking-widest hover:border-neutral-600 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mode === 'confirm-delete' && (
+          <div className="space-y-2">
+            <p className="font-mono text-[10px] text-[#FF3D00]">
+              Permanently delete all {group.members.length} records?
+              Event links will be removed (artists) or cleared (venues).
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => call('delete_entities')}
+                disabled={busy}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#FF3D00] text-white font-black text-[10px] uppercase tracking-widest hover:bg-red-400 disabled:opacity-50 transition-colors"
+              >
+                {busy ? <RefreshCw size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                Confirm Delete
+              </button>
+              <button
+                onClick={() => setMode('idle')}
+                disabled={busy}
+                className="flex items-center gap-1.5 px-3 py-2 border border-neutral-800 text-neutral-400 font-mono text-[10px] uppercase tracking-widest hover:border-neutral-600 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function SuggestionsTab({
+  items, loading, password, onResolved, onToast,
+}: {
+  items: SuggestionGroup[];
+  loading: boolean;
+  password: string;
+  onResolved: (id: string) => void;
+  onToast: (msg: string, type: ToastItem['type']) => void;
+}) {
+  const artists = items.filter(g => g.type === 'artist');
+  const venues  = items.filter(g => g.type === 'venue');
+
+  if (loading) return <Spinner />;
+
+  if (!items.length) {
+    return (
+      <EmptyState message="No duplicates detected. Your artist and venue records look clean." />
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <p className="font-mono text-[10px] text-neutral-500 uppercase tracking-widest">
+        {items.length} duplicate group{items.length !== 1 ? 's' : ''} detected via name similarity analysis.
+        Dismissed groups won&apos;t reappear.
+      </p>
+
+      {artists.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex items-center gap-2 mb-3">
+            <Users size={12} className="text-[#76FF03]" />
+            <span className="font-black text-[10px] uppercase tracking-widest text-[#76FF03]">
+              Artists — {artists.length} group{artists.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <AnimatePresence initial={false}>
+            {artists.map(g => (
+              <SuggestionCard
+                key={g.id}
+                group={g}
+                password={password}
+                onResolved={onResolved}
+                onToast={onToast}
+              />
+            ))}
+          </AnimatePresence>
+        </section>
+      )}
+
+      {venues.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex items-center gap-2 mb-3">
+            <MapPin size={12} className="text-[#00E5FF]" />
+            <span className="font-black text-[10px] uppercase tracking-widest text-[#00E5FF]">
+              Venues — {venues.length} group{venues.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <AnimatePresence initial={false}>
+            {venues.map(g => (
+              <SuggestionCard
+                key={g.id}
+                group={g}
+                password={password}
+                onResolved={onResolved}
+                onToast={onToast}
+              />
+            ))}
+          </AnimatePresence>
+        </section>
+      )}
     </div>
   );
 }
@@ -391,7 +719,7 @@ function ArtistRow({
       className="flex items-center gap-3 px-4 py-3 bg-[#111] border border-neutral-800 hover:border-neutral-700 transition-colors"
     >
       <div className="flex-1 min-w-0">
-        <p className="font-black text-sm text-white uppercase tracking-tight truncate">{item.name}</p>
+        <p className="font-black text-sm text-white truncate">{item.name}</p>
         <p className="font-mono text-[10px] text-neutral-500 mt-0.5">
           {item.event_count}&nbsp;EVENT{item.event_count !== 1 ? 'S' : ''}
         </p>
@@ -584,7 +912,7 @@ function VenueRow({
     >
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="flex-1 min-w-0">
-          <p className="font-black text-sm text-white uppercase tracking-tight truncate">{item.name}</p>
+          <p className="font-black text-sm text-white truncate">{item.name}</p>
           <p className="font-mono text-[10px] text-neutral-500 mt-0.5 flex flex-wrap gap-x-3">
             <span>{item.city}</span>
             <span>{item.event_count}&nbsp;EVENT{item.event_count !== 1 ? 'S' : ''}</span>
@@ -813,7 +1141,7 @@ function OrphanedEventCard({
       </div>
 
       <div className="w-52 shrink-0 flex flex-col justify-center gap-1">
-        <p className="font-black text-sm text-white uppercase tracking-tight leading-tight line-clamp-2">
+        <p className="font-black text-sm text-white leading-tight line-clamp-2">
           {item.event_name ?? 'Untitled Event'}
         </p>
         <p className="font-mono text-[10px] text-neutral-400 uppercase">

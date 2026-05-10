@@ -4,7 +4,6 @@ import { imageService } from "./image.service";
 import { chainedClassifier, ChainedExtractionResult, ExtractedEvent } from "./chained-classifier";
 import { generateImageHash, isNearDuplicate } from "./phash";
 import { validator } from "./validator";
-import { publishEvent } from "../events/event-publisher";
 
 /** Auto-publish threshold — events above this go straight to the events table. */
 const CONFIDENCE_THRESHOLD = Number(process.env.CONFIDENCE_THRESHOLD) || 0.85;
@@ -26,7 +25,6 @@ interface PendingRow {
 }
 
 type ProcessStatus =
-  | "auto_approved"
   | "pending_review"
   | "rejected"
   | "failed"
@@ -40,7 +38,6 @@ interface ProcessResult {
 
 export interface SilverRunResult {
   totalProcessed: number;
-  autoApproved: number;
   pendingReview: number;
   rejected: number;
   failed: number;
@@ -71,7 +68,6 @@ export class SilverWorker {
     const todayString = today.toISOString().split("T")[0];
 
     let totalProcessed = 0;
-    let autoApproved = 0;
     let pendingReview = 0;
     let rejected = 0;
     let failed = 0;
@@ -102,8 +98,7 @@ export class SilverWorker {
         totalProcessed++;
         aiCallsMade += result.aiCalls;
 
-        if (result.status === "auto_approved")    autoApproved++;
-        else if (result.status === "pending_review") pendingReview++;
+        if (result.status === "pending_review") pendingReview++;
         else if (result.status === "rejected")    rejected++;
         else if (result.status === "failed")      failed++;
         else if (result.status === "duplicate_reused") duplicatesReused++;
@@ -121,23 +116,22 @@ export class SilverWorker {
       : null;
 
     logger.info(
-      `[Silver] Done — processed: ${totalProcessed}, auto-approved: ${autoApproved}, ` +
-      `review: ${pendingReview}, rejected: ${rejected}, failed: ${failed}, ` +
-      `reused: ${duplicatesReused}, AI calls: ${aiCallsMade}`
+      `[Silver] Done — processed: ${totalProcessed}, review: ${pendingReview}, ` +
+      `rejected: ${rejected}, failed: ${failed}, reused: ${duplicatesReused}, AI calls: ${aiCallsMade}`
     );
 
     await supabase
       .from("ingestion_runs")
       .update({
         ended_at:          new Date().toISOString(),
-        events_extracted:  autoApproved + pendingReview,
+        events_extracted:  pendingReview,
         ai_calls_made:     aiCallsMade,
         average_confidence: avgConfidence,
         status:            "completed",
       })
       .eq("id", ingestionRunId);
 
-    return { totalProcessed, autoApproved, pendingReview, rejected, failed, duplicatesReused, aiCallsMade, avgConfidence };
+    return { totalProcessed, pendingReview, rejected, failed, duplicatesReused, aiCallsMade, avgConfidence };
   }
 
   // ── Per-row pipeline ──────────────────────────────────────────────────────
@@ -202,7 +196,7 @@ export class SilverWorker {
       }
 
       return {
-        status: confidence >= CONFIDENCE_THRESHOLD ? "auto_approved" : "pending_review",
+        status: "pending_review",
         confidence,
         aiCalls,
       };
@@ -330,7 +324,7 @@ export class SilverWorker {
   ): { starts_at: string | null; ends_at: string | null } {
     if (!startsAtTime) return { starts_at: null, ends_at: null };
 
-    const applyRollover = (date: Date, timeStr: string): Date => {
+    const applyRollover = (_date: Date, timeStr: string): Date => {
       const [h] = timeStr.split(":").map(Number);
       const dt = new Date(`${eventDate}T${timeStr}:00`);
       if (h >= 0 && h < 6) dt.setDate(dt.getDate() + 1); // post-midnight = next calendar day
@@ -403,20 +397,11 @@ export class SilverWorker {
       confidence_score: confidence,
     };
 
-    if (confidence >= CONFIDENCE_THRESHOLD) {
-      await this.publishToEvents(row, event, imageHash, confidence, starts_at, ends_at);
-      await supabase
-        .from("pending_events")
-        .update({ ...enrichment, status: "APPROVED" })
-        .eq("id", row.id);
-      logger.info(`[Silver] Auto-approved: "${event.event_name}" on ${event.event_date} (${confidence})`);
-    } else {
-      await supabase
-        .from("pending_events")
-        .update(enrichment)
-        .eq("id", row.id);
-      logger.info(`[Silver] Queued for review: "${event.event_name}" on ${event.event_date} (${confidence})`);
-    }
+    await supabase
+      .from("pending_events")
+      .update(enrichment)
+      .eq("id", row.id);
+    logger.info(`[Silver] Queued for review: "${event.event_name}" on ${event.event_date} (confidence: ${confidence})`);
   }
 
   private async handleWeeklyOverview(
@@ -436,7 +421,7 @@ export class SilverWorker {
         ai_raw_response: aiResult as unknown as Record<string, unknown>,
         parse_method:    "chained_gemini_v2",
         confidence_score: confidence,
-        status:          "APPROVED",
+        status:          "PENDING",
         scraper_notes:   `Split into ${events.length} per-event rows`,
       })
       .eq("id", row.id);
@@ -472,7 +457,7 @@ export class SilverWorker {
         image_hash:      imageHash,
         ai_raw_response: { extracted_from_weekly: true, parent_post_url: row.ig_post_url },
         confidence_score: confidence,
-        status:          confidence >= CONFIDENCE_THRESHOLD ? "APPROVED" : "PENDING",
+        status:          "PENDING",
         source:          "scraper",
         parse_method:    "chained_gemini_v2",
       };
@@ -480,49 +465,8 @@ export class SilverWorker {
       const { error } = await supabase.from("pending_events").insert(childRow);
       if (error) {
         logger.error(`[Silver] Failed to insert weekly overview child: ${error.message}`);
-        continue;
-      }
-
-      if (confidence >= CONFIDENCE_THRESHOLD) {
-        await this.publishToEvents(
-          { ...row, ig_post_url: childUrl },
-          event,
-          imageHash,
-          confidence,
-          starts_at,
-          ends_at
-        );
       }
     }
-  }
-
-  // ── Gold: publish to events table ─────────────────────────────────────────
-
-  private async publishToEvents(
-    row: PendingRow,
-    event: ExtractedEvent,
-    imageHash: string,
-    confidence: number,
-    starts_at: string | null,
-    ends_at: string | null
-  ): Promise<void> {
-    await publishEvent({
-      event_name:      event.event_name,
-      club_name:       row.club_name,
-      city:            row.city,
-      event_date:      event.event_date,
-      djs:             event.djs,
-      dj_name:         event.djs.join(", "),
-      image_url:       row.image_url,
-      ig_post_url:     row.ig_post_url,
-      starts_at,
-      ends_at,
-      confidence_score: confidence,
-      image_hash:       imageHash,
-      source_username:  row.source_username ?? undefined,
-      source_platform:  "instagram",
-      source_priority:  10,
-    });
   }
 
   // ── Duplicate detection ────────────────────────────────────────────────────

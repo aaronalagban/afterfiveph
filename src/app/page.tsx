@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { supabase } from "@/lib/supabase-client";
 import {
@@ -15,6 +15,7 @@ import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
 import Link from "next/link";
 import WeeklyLineupModal from "@/components/admin/WeeklyLineupModal";
 import { type StoryEvent } from "@/components/admin/generateWeeklyStory";
+import ReportButton from "@/components/ReportButton";
 
 export interface AfterFiveEvent {
   id?: string | number;
@@ -462,7 +463,7 @@ export default function AfterFivePop() {
                     darkMode={darkMode}
                   />
                 )}
-                {view === "AGENDA" && <BlockListView key="AGENDA" title="INCOMING" events={upcomingEvents} darkMode={darkMode} />}
+                {view === "AGENDA" && <BlockListView key="AGENDA" title="INCOMING" events={upcomingEvents} today={today} darkMode={darkMode} />}
                 {view === "MAP" && <MapView key="MAP" isLoaded={isMapLoaded} darkMode={darkMode} />}
                 {view === "ARCHIVE" && <ArchiveCalendarView key="ARCHIVE" events={pastEvents} darkMode={darkMode} />}
               </>
@@ -547,6 +548,11 @@ export default function AfterFivePop() {
           />
         )}
       </AnimatePresence>
+
+      {/* ── Fixed Report button ── left side avoids IG button on right ── */}
+      <div className="fixed bottom-[calc(3rem+12px)] left-3 z-40 md:bottom-5 md:left-[310px]">
+        <ReportButton />
+      </div>
 
       <div className={`mobile-nav-safe md:hidden fixed bottom-0 left-0 w-full border-t z-50 flex items-stretch ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
          <MobileNavBtn icon={<Zap size={18} />} active={view === "LIVE"} onClick={() => setView("LIVE")} color="#F53D04" darkMode={darkMode} />
@@ -719,9 +725,9 @@ function GalleryView({ events, isShowingFuture, displayTitle, darkMode }: Galler
           {(() => {
             const visibleDJs = (activeEvent.dj_names || []).filter(dj => dj.toUpperCase() !== 'HEADLINER');
             return visibleDJs.length > 0 ? (
-              <div className="hidden md:flex flex-wrap gap-2 mt-2">
+              <div className="flex flex-wrap gap-1 md:gap-2 mt-1.5 md:mt-2 overflow-hidden max-h-[22px] md:max-h-none">
                 {visibleDJs.map((dj, i) => (
-                  <span key={i} className={`px-2 py-0.5 font-mono font-bold text-xs uppercase border ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#FFFFFF] text-[#55555A] border-[#E5E5EA]'}`}>
+                  <span key={i} className={`px-1.5 md:px-2 py-[1px] md:py-0.5 font-mono font-bold text-[8px] md:text-xs uppercase border shrink-0 ${darkMode ? 'bg-[#121214] text-[#B3B3B8] border-[#2A2A2E]' : 'bg-[#FFFFFF] text-[#55555A] border-[#E5E5EA]'}`}>
                     {dj}
                   </span>
                 ))}
@@ -896,10 +902,69 @@ function EventsOverview({
 
 interface BlockListViewProps extends ViewProps {
   title: string;
+  today: string;
 }
 
-function BlockListView({ title, events, darkMode }: BlockListViewProps) {
-  const grouped = events.reduce<Record<string, AfterFiveEvent[]>>((acc, event) => {
+const MAX_WEEK_OFFSET = 4;
+
+function getWeekRangeInfo(todayStr: string, offset: number) {
+  const base = new Date(todayStr + "T12:00:00");
+  const dow = base.getDay(); // 0=Sun … 6=Sat
+  // Week is Mon–Sun. Days until this week's Sunday:
+  const daysToSun = dow === 0 ? 0 : 7 - dow;
+
+  const thisSun = new Date(base);
+  thisSun.setDate(base.getDate() + daysToSun);
+
+  if (offset === 0) {
+    return {
+      rangeStart: todayStr,
+      rangeEnd: thisSun.toISOString().substring(0, 10),
+      label: "THIS WEEK",
+    };
+  }
+
+  // offset 1 → next Mon; offset 2 → Mon after that; etc.
+  const startOfTarget = new Date(thisSun);
+  startOfTarget.setDate(thisSun.getDate() + 1 + (offset - 1) * 7);
+  const endOfTarget = new Date(startOfTarget);
+  endOfTarget.setDate(startOfTarget.getDate() + 6);
+
+  const rangeStart = startOfTarget.toISOString().substring(0, 10);
+  const rangeEnd = endOfTarget.toISOString().substring(0, 10);
+
+  if (offset === 1) return { rangeStart, rangeEnd, label: "NEXT WEEK" };
+
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase();
+  return { rangeStart, rangeEnd, label: `${fmt(startOfTarget)} – ${fmt(endOfTarget)}` };
+}
+
+function BlockListView({ title, events, today, darkMode }: BlockListViewProps) {
+  const [weekOffset, setWeekOffset] = useState(0);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerH, setHeaderH] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!headerRef.current) return;
+    const el = headerRef.current;
+    const update = () => setHeaderH(el.offsetHeight);
+    update();
+    const obs = new ResizeObserver(update);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const { rangeStart, rangeEnd, label } = getWeekRangeInfo(today, weekOffset);
+
+  const filteredEvents = events.filter((e) => {
+    const d = String(e.event_date).substring(0, 10);
+    if (d <= today) return false;
+    if (weekOffset === 0) return d <= rangeEnd;
+    return d >= rangeStart && d <= rangeEnd;
+  });
+
+  const grouped = filteredEvents.reduce<Record<string, AfterFiveEvent[]>>((acc, event) => {
     if (!event.event_date) return acc;
     const dateStr = String(event.event_date).substring(0, 10);
     if (!acc[dateStr]) acc[dateStr] = [];
@@ -915,11 +980,46 @@ function BlockListView({ title, events, darkMode }: BlockListViewProps) {
     >
        <div className={`fixed inset-0 pointer-events-none z-0 ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
        
-       <div className={`sticky top-0 z-50 border-b p-4 md:p-8 backdrop-blur-md ${darkMode ? 'bg-[#0B0B0D]/95 border-[#2A2A2E]' : 'bg-[#FFFFFF]/95 border-[#E5E5EA]'}`}>
-          <h1 className={`font-black text-4xl md:text-7xl uppercase tracking-tighter leading-none ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>{title}</h1>
+       <div ref={headerRef} className={`sticky top-0 z-50 border-b backdrop-blur-md ${darkMode ? 'bg-[#0B0B0D]/95 border-[#2A2A2E]' : 'bg-[#FFFFFF]/95 border-[#E5E5EA]'}`}>
+          <div className="px-4 pt-4 pb-3 md:px-8 md:pt-8 md:pb-4">
+            <h1 className={`font-black text-4xl md:text-7xl uppercase tracking-tighter leading-none ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>{title}</h1>
+          </div>
+          <div className={`flex items-center border-t ${darkMode ? 'border-[#2A2A2E]' : 'border-[#E5E5EA]'}`}>
+            {/* Left arrow */}
+            <button
+              onClick={() => setWeekOffset(o => Math.max(0, o - 1))}
+              disabled={weekOffset === 0}
+              className={`shrink-0 flex items-center justify-center w-10 h-10 md:w-14 md:h-14 border-r transition-colors disabled:opacity-20 ${darkMode ? 'border-[#2A2A2E] text-[#FFFFFF] hover:bg-[#1C1C20] disabled:hover:bg-transparent' : 'border-[#E5E5EA] text-[#111111] hover:bg-[#F7F7F9] disabled:hover:bg-transparent'}`}
+              aria-label="Previous week"
+            >
+              <ChevronLeft size={16} />
+            </button>
+
+            {/* Week label */}
+            <div className="flex-1 flex items-center justify-center py-2 md:py-3">
+              <span className={`font-black text-[10px] md:text-sm uppercase tracking-[0.2em] ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>{label}</span>
+            </div>
+
+            {/* Right arrow */}
+            <button
+              onClick={() => setWeekOffset(o => Math.min(MAX_WEEK_OFFSET, o + 1))}
+              disabled={weekOffset === MAX_WEEK_OFFSET}
+              className={`shrink-0 flex items-center justify-center w-10 h-10 md:w-14 md:h-14 border-l transition-colors disabled:opacity-20 ${darkMode ? 'border-[#2A2A2E] text-[#FFFFFF] hover:bg-[#1C1C20] disabled:hover:bg-transparent' : 'border-[#E5E5EA] text-[#111111] hover:bg-[#F7F7F9] disabled:hover:bg-transparent'}`}
+              aria-label="Next week"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
        </div>
 
         <div className="flex flex-col relative z-10">
+          {sortedDates.length === 0 && (
+            <div className={`flex flex-col items-center justify-center py-24 px-8 text-center ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>
+              <span className="font-black text-5xl mb-4">—</span>
+              <p className="font-black text-sm uppercase tracking-widest">No events scheduled</p>
+              <p className="font-mono text-xs mt-2 uppercase tracking-wider opacity-60">Check back soon</p>
+            </div>
+          )}
           {sortedDates.map((date) => {
                const dateObj = new Date(date);
                const isWeekend = dateObj.getDay() === 5 || dateObj.getDay() === 6;
@@ -927,7 +1027,8 @@ function BlockListView({ title, events, darkMode }: BlockListViewProps) {
                return (
                  <div key={date} className={`relative ${isWeekend ? 'ring-1 ring-[#F53D04]/50 z-20' : ''}`}>
                     <div 
-                      className={`sticky top-[69px] md:top-[137px] z-40 py-3 px-3 md:px-6 flex justify-between items-center transition-all ${
+                      style={{ top: headerH || undefined }}
+                      className={`sticky z-40 py-3 px-3 md:px-6 flex justify-between items-center transition-all ${
                         isWeekend 
                           ? (darkMode ? 'bg-[#1C1C20] border-b-2 border-[#F53D04]' : 'bg-[#FFE5DE] border-b-2 border-[#F53D04]') 
                           : (darkMode ? 'bg-[#151518] border-b border-[#2A2A2E]' : 'bg-[#F7F7F9] border-b border-[#E5E5EA]')
