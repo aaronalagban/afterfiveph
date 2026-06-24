@@ -7,6 +7,9 @@ import { DJCombobox } from '@/components/admin/DJCombobox';
 import { ImageGridSelector } from '@/components/admin/ImageGridSelector';
 import { AIContextPanel } from '@/components/admin/AIContextPanel';
 import type { AdminPendingEvent, AdminLiveEvent } from '@/types/admin';
+// TODO(fete-2026): temporary campaign import — remove with the rest of the
+// Fête feature (see src/features/fete/fete.config.ts).
+import { isFeteGuideActive } from '@/features/fete/fete.config';
 
 // ─── Manila time helpers ───────────────────────────────────────────────────────
 
@@ -51,6 +54,8 @@ type FormState = {
   dj_name: string;
   djs: string[];
   image_url: string;
+  // TODO(fete-2026): temporary campaign field — remove with the rest of the Fête feature.
+  is_fete_2026: boolean;
 };
 
 const inputCls =
@@ -83,6 +88,7 @@ export function InlineReviewPanel({ event, mode, password, onPromoted, onRejecte
     dj_name:        event.dj_name    ?? '',
     djs:            event.djs        ?? [],
     image_url:      event.image_url  ?? '',
+    is_fete_2026:   (event as AdminLiveEvent).is_fete_2026 ?? false,
   });
 
   const [carousel, setCarousel]           = useState<string[]>(event.carousel_images ?? []);
@@ -116,8 +122,10 @@ export function InlineReviewPanel({ event, mode, password, onPromoted, onRejecte
     if (carousel.length > 0) payload.carousel_images = carousel;
     if (form.starts_at_time) payload.starts_at = buildISO(form.event_date, form.starts_at_time);
     if (form.ends_at_time)   payload.ends_at   = buildISO(form.event_date, form.ends_at_time);
+    // TODO(fete-2026): temporary campaign field — remove with the rest of the Fête feature.
+    if (!isPending) payload.is_fete_2026 = form.is_fete_2026;
     return payload;
-  }, [form, carousel]);
+  }, [form, carousel, isPending]);
 
   const fetchCarousel = async () => {
     if (!event.ig_post_url) return;
@@ -329,6 +337,23 @@ export function InlineReviewPanel({ event, mode, password, onPromoted, onRejecte
           <Field label="DJs (searchable)">
             <DJCombobox selected={form.djs} onChange={djs => setForm(f => ({ ...f, djs }))} />
           </Field>
+
+          {/* TODO(fete-2026): temporary campaign control — remove with the rest of
+              the Fête feature (see src/features/fete/fete.config.ts). Only shown
+              while the campaign window is active. */}
+          {!isPending && isFeteGuideActive() && (
+            <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-[#cd1d1d]/60 bg-[#fdb903]/10 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.is_fete_2026}
+                onChange={e => setField('is_fete_2026', e.target.checked)}
+                className="accent-[#cd1d1d]"
+              />
+              <span className="font-mono text-[10px] uppercase tracking-widest text-[#cd1d1d]">
+                Include in Fête Guide
+              </span>
+            </label>
+          )}
         </div>
 
         {/* ── Right: AI Context (pending only) ─────────────────────────── */}

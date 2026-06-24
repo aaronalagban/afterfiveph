@@ -38,6 +38,9 @@ export interface AdminLiveEvent {
   confidence_score: number | null;
   source_username: string | null;
   source: string | null;
+  // TODO(fete-2026): temporary campaign field — remove with the rest of the
+  // Fête feature (see src/features/fete/fete.config.ts).
+  is_fete_2026?: boolean;
 }
 
 export type CMSTab = 'review' | 'live' | 'cleanup' | 'stats' | 'reports';

@@ -5,6 +5,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Search, X, ExternalLink, ImageOff, ChevronDown } from 'lucide-react';
 import { InlineReviewPanel } from './InlineReviewPanel';
 import type { AdminLiveEvent, CMSAction } from '@/types/admin';
+// TODO(fete-2026): temporary campaign import — remove with the rest of the
+// Fête feature (see src/features/fete/fete.config.ts).
+import { isFeteGuideActive } from '@/features/fete/fete.config';
 
 interface Props {
   events:     AdminLiveEvent[];
@@ -135,7 +138,15 @@ function LiveEventRow({ event, isExpanded, password, dispatch, onToggle }: {
           </div>
         </td>
         <td className="px-4 py-2 max-w-[220px]">
-          <p className="font-black text-sm text-white uppercase tracking-tight truncate">{event.event_name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="font-black text-sm text-white uppercase tracking-tight truncate">{event.event_name}</p>
+            {/* TODO(fete-2026): temporary badge — remove with the rest of the Fête feature */}
+            {event.is_fete_2026 && isFeteGuideActive() && (
+              <span title="Fête de la Musique" className="shrink-0 px-1.5 py-0.5 bg-[#fdb903] border border-[#cd1d1d] text-[#cd1d1d] font-black text-[8px] uppercase tracking-widest">
+                Fête
+              </span>
+            )}
+          </div>
         </td>
         <td className="px-4 py-2 max-w-[160px]">
           <p className="font-mono text-[10px] text-neutral-400 truncate">

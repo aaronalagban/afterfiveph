@@ -19,9 +19,11 @@ export async function POST(request: Request) {
     const supabase = getAdminClient();
     const today = new Date().toISOString().split('T')[0];
 
+    // TODO(fete-2026): drop `is_fete_2026` from this select once the Fête
+    // campaign is retired (see src/features/fete/fete.config.ts).
     const { data, error } = await supabase
       .from('events')
-      .select('id, event_name, dj_name, club_name, city, event_date, image_url, ig_post_url, djs, carousel_images, starts_at, ends_at, confidence_score, source_username, source_platform')
+      .select('id, event_name, dj_name, club_name, city, event_date, image_url, ig_post_url, djs, carousel_images, starts_at, ends_at, confidence_score, source_username, source_platform, is_fete_2026')
       .gte('event_date', today)
       .order('event_date', { ascending: true });
 
