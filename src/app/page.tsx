@@ -421,7 +421,7 @@ export default function AfterFivePop() {
               <h2 className="font-black text-2xl uppercase mb-4 text-[#cd1d1d]">The Fête Guide Is Live</h2>
 
               <p className="font-mono text-sm mb-6 leading-relaxed text-[#cd1d1d]/90">
-                Fête de la Musique takes over Manila this June. We rounded up selected parties and DJ sets on our radar so you know where the night could take you. See ya!
+                Fête de la Musique takes over Manila this June. We rounded up selected parties and DJ sets on our radar so you know where the night could take you.
               </p>
 
               <div className="flex flex-col gap-3">
