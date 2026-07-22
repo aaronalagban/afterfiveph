@@ -21,9 +21,6 @@ const ALLOWED_FIELDS = new Set([
   'carousel_images',
   'starts_at',
   'ends_at',
-  // TODO(fete-2026): temporary campaign field — remove once the Fête feature
-  // is retired (see src/features/fete/fete.config.ts).
-  'is_fete_2026',
 ]);
 
 export async function PATCH(request: Request) {

@@ -16,9 +16,6 @@ import Link from "next/link";
 import WeeklyLineupModal from "@/components/admin/WeeklyLineupModal";
 import { type StoryEvent } from "@/components/admin/generateWeeklyStory";
 import ReportButton from "@/components/ReportButton";
-// TODO(fete-2026): temporary campaign — remove this import + every call site
-// once the Fête de la Musique feature is retired (see src/features/fete/fete.config.ts).
-import { isFeteGuideActive, isFeteDay, msUntilFeteExpiry, FETE_INSTAGRAM_URL } from "@/features/fete/fete.config";
 
 export interface AfterFiveEvent {
   id?: string | number;
@@ -30,7 +27,6 @@ export interface AfterFiveEvent {
   dj_names: string[];
   image_url?: string;
   ig_post_url?: string;
-  is_fete_2026?: boolean; // TODO(fete-2026): temporary campaign flag, drop with the rest of the feature
   [key: string]: unknown;
 }
 
@@ -94,16 +90,12 @@ export default function AfterFivePop() {
   const [events, setEvents] = useState<AfterFiveEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSplash, setShowSplash] = useState(false);
+  const [showDevNote, setShowDevNote] = useState(false);
   const [showBetaModal, setShowBetaModal] = useState(false);
   const [view, setView] = useState<"LIVE" | "AGENDA" | "MAP" | "ARCHIVE">("LIVE");
   const [darkMode, setDarkMode] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showLineup, setShowLineup] = useState(false);
-
-  // TODO(fete-2026): temporary campaign state — remove with the rest of the Fête feature.
-  const [showFeteModal, setShowFeteModal] = useState(false);
-  const [feteTabOpen, setFeteTabOpen] = useState(false);
-  const [, forceFeteExpiryCheck] = useState(0);
 
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded: isMapLoaded } = useLoadScript({ googleMapsApiKey: googleMapsKey || "" });
@@ -122,27 +114,18 @@ export default function AfterFivePop() {
     if (meta) meta.setAttribute('content', '#050505');
   }, [darkMode]);
 
-  // TODO(fete-2026): forces a re-render exactly when the campaign window
-  // closes, so Fête UI disappears live without needing a page refresh.
-  useEffect(() => {
-    const ms = msUntilFeteExpiry();
-    if (ms <= 0) return;
-    const t = setTimeout(() => forceFeteExpiryCheck(n => n + 1), ms);
-    return () => clearTimeout(t);
-  }, []);
-
   useEffect(() => {
     const hasSeenIntro = localStorage.getItem(INTRO_SEEN_KEY) === "1";
     let splashTimer: NodeJS.Timeout | undefined;
 
     if (hasSeenIntro) {
-      setShowBetaModal(true);
+      setShowDevNote(true);
     } else {
       setShowSplash(true);
       localStorage.setItem(INTRO_SEEN_KEY, "1");
       splashTimer = setTimeout(() => {
         setShowSplash(false);
-        setShowBetaModal(true);
+        setShowDevNote(true);
       }, 3500);
     }
 
@@ -245,15 +228,6 @@ export default function AfterFivePop() {
   const upcomingEvents = events.filter((e) => normalizeDbDate(e.event_date) > today);
   const pastEvents = events.filter((e) => normalizeDbDate(e.event_date) < today).reverse();
 
-  // TODO(fete-2026): temporary campaign — remove with the rest of the Fête feature.
-  const feteActive = isFeteGuideActive();
-  const feteEvents = feteActive
-    ? events.filter((e) => e.is_fete_2026 && normalizeDbDate(e.event_date) >= today)
-    : [];
-  // True while the user is actually looking at the Fête Guide tab — drives a
-  // full app-shell takeover (nav, headers, mobile bar all go yellow/red).
-  const feteThemeActive = feteActive && view === "LIVE" && feteTabOpen;
-
   let galleryData = tonightEvents;
   let isShowingFuture = false;
   let displayTitle = "TONIGHT";
@@ -276,7 +250,7 @@ export default function AfterFivePop() {
   }
 
   return (
-    <div className={`fixed inset-0 w-full h-full font-sans overflow-hidden flex flex-col md:flex-row transition-colors duration-500 ${feteThemeActive ? 'bg-[#fdb903] text-[#cd1d1d]' : darkMode ? 'bg-[#0B0B0D] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#111111]'}`}>
+    <div className={`fixed inset-0 w-full h-full font-sans overflow-hidden flex flex-col md:flex-row transition-colors duration-500 ${darkMode ? 'bg-[#0B0B0D] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#111111]'}`}>
       
       <style dangerouslySetInnerHTML={{ __html: `
         .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -334,11 +308,6 @@ export default function AfterFivePop() {
         }
       `}} />
 
-      {/* TODO(fete-2026): cinematic one-shot wipe — remove with the rest of the Fête feature */}
-      <AnimatePresence>
-        {feteThemeActive && <FeteWipeOverlay key="fete-wipe" />}
-      </AnimatePresence>
-
       <AnimatePresence>
         {showSplash && (
           <motion.div 
@@ -359,7 +328,50 @@ export default function AfterFivePop() {
           </motion.div>
         )}
       </AnimatePresence>
-      
+
+      {/* Developer's note — a farewell, shown first on load before the beta modal */}
+      <AnimatePresence>
+        {showDevNote && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className={`border w-full max-w-lg max-h-[85vh] flex flex-col ${darkMode ? 'bg-[#1C1C20] border-[#2A2A2E] text-[#FFFFFF]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]'}`}
+            >
+              <div className="overflow-y-auto hide-scrollbar px-6 md:px-8 pt-8 pb-6">
+                <div className={`font-mono font-bold text-[10px] uppercase tracking-[0.3em] mb-3 ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>
+                  A Note from the Developer
+                </div>
+
+                <div className={`font-mono text-[13px] leading-relaxed space-y-4 ${darkMode ? 'text-[#B3B3B8]' : 'text-[#55555A]'}`}>
+                  <p>The AfterFive website is no longer under active development.</p>
+                  <p>When I built it, I genuinely believed people needed help finding the right events. But after spending more time in the nightlife scene, I realized something: people eventually find where they&apos;re supposed to be. Through friends, through DJs, through one random night that somehow leads to another. Looking back, I think that&apos;s a sign of a healthy community.</p>
+                  <p>I also realized that not everything needs to be solved with technology.</p>
+                  <p>A huge part of what made me fall in love with the scene was everything that happened between the events. Showing up alone. Meeting people I would&apos;ve never met otherwise. Running into the same faces over and over until they weren&apos;t strangers anymore. Some of my favorite nights weren&apos;t memorable because of where I went. They were memorable because of who I met.</p>
+                  <p>If the website could perfectly optimize all of that, I think it would also take away the chance to stumble into something unforgettable.</p>
+                  <p>So, in a weird way, the AfterFive website did exactly what I wanted it to do.</p>
+                  <p className={`font-black ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>It changed my mind.</p>
+                  <p>The website will stay online for as long as it can (mostly because the backend somehow refuses to break), but there won&apos;t be any new features or active development.</p>
+                  <p>Thank you to everyone who visited the website, shared it with a friend, or simply believed it was worth building.</p>
+                  <p>And just to be clear, this is only the end of the website. AfterFive, the collective, is still very much alive.</p>
+                  <p className={`font-black text-base pt-1 ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>Aaron</p>
+                </div>
+              </div>
+
+              <div className={`shrink-0 border-t p-4 ${darkMode ? 'border-[#2A2A2E]' : 'border-[#E5E5EA]'}`}>
+                <button
+                  onClick={() => { setShowDevNote(false); setShowBetaModal(true); }}
+                  className={`w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#F53D04] hover:border-[#F53D04]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#F53D04] hover:text-[#FFFFFF] hover:border-[#F53D04]'}`}
+                >
+                  Continue
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showBetaModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -388,13 +400,7 @@ export default function AfterFivePop() {
                 </a>
 
                 <button
-                  onClick={() => {
-                    setShowBetaModal(false);
-                    // TODO(fete-2026): chains into the Fête modal right after
-                    // the beta modal closes — remove with the rest of the
-                    // Fête feature.
-                    if (isFeteGuideActive()) setShowFeteModal(true);
-                  }}
+                  onClick={() => setShowBetaModal(false)}
                   className={`w-full py-3 font-black uppercase transition-all duration-300 border ${darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#F53D04] hover:border-[#F53D04]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#F53D04] hover:text-[#FFFFFF] hover:border-[#F53D04]'}`}
                 >
                   Aight
@@ -405,69 +411,17 @@ export default function AfterFivePop() {
         )}
       </AnimatePresence>
 
-      {/* TODO(fete-2026): temporary campaign modal — remove with the rest of the Fête feature */}
-      <AnimatePresence>
-        {showFeteModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="border-2 border-[#cd1d1d] p-8 max-w-sm w-full text-center bg-[#fdb903]"
-            >
-              <div className="font-mono font-bold text-[10px] uppercase tracking-[0.3em] text-[#cd1d1d] mb-2">
-                Fête de la Musique
-              </div>
-              <h2 className="font-black text-2xl uppercase mb-4 text-[#cd1d1d]">The Fête Guide Is Live</h2>
-
-              <p className="font-mono text-sm mb-6 leading-relaxed text-[#cd1d1d]/90">
-                Fête de la Musique takes over Manila this June. We rounded up selected parties and DJ sets on our radar so you know where the night could take you. See ya!
-              </p>
-
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={() => {
-                    setShowFeteModal(false);
-                    setView("LIVE");
-                    setFeteTabOpen(true);
-                  }}
-                  className="w-full py-3 font-black uppercase transition-all duration-300 bg-[#cd1d1d] text-[#fdb903] hover:bg-[#a51717]"
-                >
-                  Open Fête Guide
-                </button>
-
-                <button
-                  onClick={() => setShowFeteModal(false)}
-                  className="w-full py-3 font-black uppercase transition-all duration-300 border-2 border-[#cd1d1d] text-[#cd1d1d] hover:bg-[#cd1d1d] hover:text-[#fdb903]"
-                >
-                  Maybe Later
-                </button>
-
-                <a
-                  href={FETE_INSTAGRAM_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-center gap-1.5 mt-1 font-mono text-[10px] uppercase tracking-widest text-[#cd1d1d]/60 hover:text-[#cd1d1d] transition-colors"
-                >
-                  <Instagram size={11} /> @fetedelamusiqueph
-                </a>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <nav className={`hidden md:flex flex-col w-[300px] h-full border-r z-50 shrink-0 transition-colors duration-500 ${feteThemeActive ? 'bg-[#fdb903] border-[#cd1d1d]' : darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
-        <div className={`h-[180px] border-b flex flex-col items-center justify-center p-6 text-center relative overflow-hidden transition-colors duration-500 ${feteThemeActive ? 'bg-[#fdb903] border-[#cd1d1d]' : darkMode ? 'bg-[#0B0B0D] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}>
-           {!feteThemeActive && <div className={`absolute inset-0 opacity-10 ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />}
+      <nav className={`hidden md:flex flex-col w-[300px] h-full border-r z-50 shrink-0 transition-colors duration-500 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+        <div className={`h-[180px] border-b flex flex-col items-center justify-center p-6 text-center relative overflow-hidden transition-colors duration-500 ${darkMode ? 'bg-[#0B0B0D] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}>
+           <div className={`absolute inset-0 opacity-10 ${darkMode ? 'playful-bg-dark' : 'playful-bg'}`} />
            <img src="/logo-1.png" alt="AfterFive Logo" className="w-48 z-10 relative cursor-pointer hover:scale-105 transition-transform" onClick={() => setView("LIVE")} />
         </div>
 
         <div className="flex-1 flex flex-col overflow-y-auto hide-scrollbar">
-          <SidebarLink label="CURRENT" sub="HAPPENING NOW" active={view === "LIVE"} onClick={() => setView("LIVE")} color={feteThemeActive ? "#cd1d1d" : "#F53D04"} icon={<Zap />} darkMode={darkMode} feteTheme={feteThemeActive} />
-          <SidebarLink label="INCOMING" sub="THIS WEEK" active={view === "AGENDA"} onClick={() => setView("AGENDA")} color={darkMode ? "#5C548A" : "#7A7399"} icon={<Calendar />} darkMode={darkMode} feteTheme={feteThemeActive} />
-          <SidebarLink label="MAP" sub="VENUES" active={view === "MAP"} onClick={() => setView("MAP")} color={darkMode ? "#3A6E8F" : "#5F8EA8"} icon={<MapIcon />} darkMode={darkMode} feteTheme={feteThemeActive} />
-          <SidebarLink label="ARCHIVES" sub="WHAT YOU MISSED" active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} color={darkMode ? "#8F4A5A" : "#A06A75"} icon={<Disc />} darkMode={darkMode} feteTheme={feteThemeActive} />
+          <SidebarLink label="CURRENT" sub="HAPPENING NOW" active={view === "LIVE"} onClick={() => setView("LIVE")} color="#F53D04" icon={<Zap />} darkMode={darkMode} />
+          <SidebarLink label="INCOMING" sub="THIS WEEK" active={view === "AGENDA"} onClick={() => setView("AGENDA")} color={darkMode ? "#5C548A" : "#7A7399"} icon={<Calendar />} darkMode={darkMode} />
+          <SidebarLink label="MAP" sub="VENUES" active={view === "MAP"} onClick={() => setView("MAP")} color={darkMode ? "#3A6E8F" : "#5F8EA8"} icon={<MapIcon />} darkMode={darkMode} />
+          <SidebarLink label="ARCHIVES" sub="WHAT YOU MISSED" active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} color={darkMode ? "#8F4A5A" : "#A06A75"} icon={<Disc />} darkMode={darkMode} />
 
           <SidebarLink
             href="/communities"
@@ -478,26 +432,25 @@ export default function AfterFivePop() {
             icon={<Users />}
             darkMode={darkMode}
             highlight={true}
-            feteTheme={feteThemeActive}
           />
         </div>
 
-        <div className={`border-t font-mono text-[10px] uppercase tracking-wider transition-colors duration-500 ${feteThemeActive ? 'bg-[#fdb903] border-[#cd1d1d] text-[#cd1d1d]' : darkMode ? 'bg-[#151518] border-[#2A2A2E] text-[#B3B3B8]' : 'bg-[#F7F7F9] border-[#E5E5EA] text-[#55555A]'}`}>
+        <div className={`border-t font-mono text-[10px] uppercase tracking-wider transition-colors duration-500 ${darkMode ? 'bg-[#151518] border-[#2A2A2E] text-[#B3B3B8]' : 'bg-[#F7F7F9] border-[#E5E5EA] text-[#55555A]'}`}>
           <button
             onClick={() => setShowLineup(true)}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 font-mono text-[10px] uppercase tracking-widest border-b transition-colors ${feteThemeActive ? 'border-[#cd1d1d]/40 hover:bg-[#cd1d1d] hover:text-[#fdb903]' : darkMode ? 'border-[#2A2A2E] hover:bg-[#F53D04] hover:text-white' : 'border-[#E5E5EA] hover:bg-[#F53D04] hover:text-white'}`}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 font-mono text-[10px] uppercase tracking-widest border-b transition-colors ${darkMode ? 'border-[#2A2A2E] hover:bg-[#F53D04] hover:text-white' : 'border-[#E5E5EA] hover:bg-[#F53D04] hover:text-white'}`}
           >
             <Share2 size={11} /> Share This Week
           </button>
           <div className="p-4 flex justify-between items-center">
-            <a href="/submit" className={`transition-colors flex items-center gap-1 group ${feteThemeActive ? 'hover:text-[#a51717]' : 'hover:text-[#F53D04]'}`}>
+            <a href="/submit" className="transition-colors flex items-center gap-1 group hover:text-[#F53D04]">
               <Plus size={12} className="group-hover:rotate-90 transition-transform" /> Submit Event
             </a>
             <div className="flex items-center gap-3">
-              <button onClick={() => setShowInfo(true)} className={`transition-colors flex items-center gap-1 ${feteThemeActive ? 'hover:text-[#a51717]' : 'hover:text-[#F53D04]'}`}>
+              <button onClick={() => setShowInfo(true)} className="transition-colors flex items-center gap-1 hover:text-[#F53D04]">
                 <Info size={12} /> Info
               </button>
-              <button onClick={() => setDarkMode(!darkMode)} className={`transition-colors flex items-center gap-1 ${feteThemeActive ? 'hover:text-[#a51717]' : 'hover:text-[#F53D04]'}`}>
+              <button onClick={() => setDarkMode(!darkMode)} className="transition-colors flex items-center gap-1 hover:text-[#F53D04]">
                 {darkMode ? <Sun size={12} /> : <Moon size={12} />} Theme
               </button>
             </div>
@@ -508,32 +461,32 @@ export default function AfterFivePop() {
 
       <main className="flex-1 w-full h-full relative overflow-hidden flex flex-col">
         {/* Mobile header — outer div absorbs notch height via env(safe-area-inset-top) */}
-        <div className={`md:hidden w-full border-b z-50 shrink-0 mobile-safe-top transition-colors duration-500 ${feteThemeActive ? 'bg-[#fdb903] border-[#cd1d1d]' : darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+        <div className={`md:hidden w-full border-b z-50 shrink-0 mobile-safe-top transition-colors duration-500 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
           <div className="h-12 flex items-center justify-between px-4">
             <img src="/logo-1.png" alt="AfterFive Logo" className="h-5 w-auto cursor-pointer" onClick={() => setView("LIVE")} />
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setShowLineup(true)}
                 title="Share This Week"
-                className={`transition-colors p-1 ${feteThemeActive ? 'text-[#cd1d1d] hover:text-[#a51717]' : darkMode ? 'text-[#6E6E73] hover:text-[#F53D04]' : 'text-[#8C8C92] hover:text-[#F53D04]'}`}
+                className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#F53D04]' : 'text-[#8C8C92] hover:text-[#F53D04]'}`}
               >
                 <Share2 size={15} />
               </button>
               <a
                 href="/submit"
-                className={`font-black text-[9px] uppercase tracking-widest border px-2.5 py-1 transition-colors flex items-center gap-1 ${feteThemeActive ? 'border-[#cd1d1d]/50 text-[#cd1d1d] hover:border-[#cd1d1d] hover:text-[#a51717]' : darkMode ? 'border-[#2A2A2E] text-[#B3B3B8] hover:border-[#F53D04] hover:text-[#F53D04]' : 'border-[#E5E5EA] text-[#55555A] hover:border-[#F53D04] hover:text-[#F53D04]'}`}
+                className={`font-black text-[9px] uppercase tracking-widest border px-2.5 py-1 transition-colors flex items-center gap-1 ${darkMode ? 'border-[#2A2A2E] text-[#B3B3B8] hover:border-[#F53D04] hover:text-[#F53D04]' : 'border-[#E5E5EA] text-[#55555A] hover:border-[#F53D04] hover:text-[#F53D04]'}`}
               >
                 <Plus size={9} />SUBMIT
               </a>
               <button
                 onClick={() => setDarkMode(!darkMode)}
-                className={`transition-colors p-1 ${feteThemeActive ? 'text-[#cd1d1d] hover:text-[#a51717]' : darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]'}`}
+                className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]'}`}
               >
                 {darkMode ? <Sun size={15} /> : <Moon size={15} />}
               </button>
               <button
                 onClick={() => setShowInfo(true)}
-                className={`transition-colors p-1 ${feteThemeActive ? 'text-[#cd1d1d] hover:text-[#a51717]' : darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]'}`}
+                className={`transition-colors p-1 ${darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]'}`}
               >
                 <Info size={15} />
               </button>
@@ -552,10 +505,6 @@ export default function AfterFivePop() {
                     isShowingFuture={isShowingFuture}
                     displayTitle={displayTitle}
                     darkMode={darkMode}
-                    feteActive={feteActive}
-                    feteEvents={feteEvents}
-                    feteTabOpen={feteTabOpen}
-                    setFeteTabOpen={setFeteTabOpen}
                   />
                 )}
                 {view === "AGENDA" && <BlockListView key="AGENDA" title="INCOMING" events={upcomingEvents} today={today} darkMode={darkMode} />}
@@ -649,17 +598,17 @@ export default function AfterFivePop() {
         <ReportButton />
       </div>
 
-      <div className={`mobile-nav-safe md:hidden fixed bottom-0 left-0 w-full border-t z-50 flex items-stretch transition-colors duration-500 ${feteThemeActive ? 'bg-[#fdb903] border-[#cd1d1d]' : darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
-         <MobileNavBtn icon={<Zap size={18} />} active={view === "LIVE"} onClick={() => setView("LIVE")} color={feteThemeActive ? "#cd1d1d" : "#F53D04"} darkMode={darkMode} feteTheme={feteThemeActive} />
-         <div className={`w-[1px] h-full ${feteThemeActive ? 'bg-[#cd1d1d]/30' : darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
-         <MobileNavBtn icon={<Calendar size={18} />} active={view === "AGENDA"} onClick={() => setView("AGENDA")} color={darkMode ? "#5C548A" : "#7A7399"} darkMode={darkMode} feteTheme={feteThemeActive} />
-         <div className={`w-[1px] h-full ${feteThemeActive ? 'bg-[#cd1d1d]/30' : darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
-         <MobileNavBtn icon={<MapIcon size={18} />} active={view === "MAP"} onClick={() => setView("MAP")} color={darkMode ? "#3A6E8F" : "#5F8EA8"} darkMode={darkMode} feteTheme={feteThemeActive} />
-         <div className={`w-[1px] h-full ${feteThemeActive ? 'bg-[#cd1d1d]/30' : darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
-         <MobileNavBtn icon={<Disc size={18} />} active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} color={darkMode ? "#8F4A5A" : "#A06A75"} darkMode={darkMode} feteTheme={feteThemeActive} />
-         <div className={`w-[1px] h-full ${feteThemeActive ? 'bg-[#cd1d1d]/30' : darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
+      <div className={`mobile-nav-safe md:hidden fixed bottom-0 left-0 w-full border-t z-50 flex items-stretch transition-colors duration-500 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
+         <MobileNavBtn icon={<Zap size={18} />} active={view === "LIVE"} onClick={() => setView("LIVE")} color="#F53D04" darkMode={darkMode} />
+         <div className={`w-[1px] h-full ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
+         <MobileNavBtn icon={<Calendar size={18} />} active={view === "AGENDA"} onClick={() => setView("AGENDA")} color={darkMode ? "#5C548A" : "#7A7399"} darkMode={darkMode} />
+         <div className={`w-[1px] h-full ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
+         <MobileNavBtn icon={<MapIcon size={18} />} active={view === "MAP"} onClick={() => setView("MAP")} color={darkMode ? "#3A6E8F" : "#5F8EA8"} darkMode={darkMode} />
+         <div className={`w-[1px] h-full ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
+         <MobileNavBtn icon={<Disc size={18} />} active={view === "ARCHIVE"} onClick={() => setView("ARCHIVE")} color={darkMode ? "#8F4A5A" : "#A06A75"} darkMode={darkMode} />
+         <div className={`w-[1px] h-full ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
 
-         <MobileNavBtn href="/communities" icon={<Users size={18} />} active={false} color={darkMode ? "#10B981" : "#059669"} darkMode={darkMode} highlight={true} feteTheme={feteThemeActive} />
+         <MobileNavBtn href="/communities" icon={<Users size={18} />} active={false} color={darkMode ? "#10B981" : "#059669"} darkMode={darkMode} highlight={true} />
       </div>
 
     </div>
@@ -674,14 +623,9 @@ interface ViewProps {
 interface GalleryViewProps extends ViewProps {
   isShowingFuture: boolean;
   displayTitle: string;
-  // TODO(fete-2026): temporary campaign props — remove with the rest of the Fête feature.
-  feteActive: boolean;
-  feteEvents: AfterFiveEvent[];
-  feteTabOpen: boolean;
-  setFeteTabOpen: (open: boolean) => void;
 }
 
-function GalleryView({ events, isShowingFuture, displayTitle, darkMode, feteActive, feteEvents, feteTabOpen, setFeteTabOpen }: GalleryViewProps) {
+function GalleryView({ events, isShowingFuture, displayTitle, darkMode }: GalleryViewProps) {
   const [current, setCurrent] = useState(0);
   const [showOverview, setShowOverview] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -705,46 +649,28 @@ function GalleryView({ events, isShowingFuture, displayTitle, darkMode, feteActi
 
   const hasEvents = !!events && events.length > 0;
 
-  // Active state is "poster" / "overview" / "fete" — the Fête tab lives
-  // alongside the existing toggle rather than replacing it.
-  const isFeteActiveTab = feteTabOpen;
-  const isOverviewActiveTab = !feteTabOpen && showOverview;
-  const isPosterActiveTab = !feteTabOpen && !showOverview;
+  // Active state is "poster" / "overview".
+  const isOverviewActiveTab = showOverview;
+  const isPosterActiveTab = !showOverview;
 
-  // TODO(fete-2026): while the Fête Guide tab is open, the toggle row itself
-  // goes yellow/red instead of the regular dark/light chrome — remove with
-  // the rest of the Fête feature.
   const toggle = (
     <LayoutGroup>
-      <div className={`flex items-stretch h-9 border max-w-[92vw] overflow-x-auto hide-scrollbar transition-colors duration-500 ${isFeteActiveTab ? 'bg-[#fdb903] border-[#cd1d1d]' : darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}>
+      <div className={`flex items-stretch h-9 border max-w-[92vw] overflow-x-auto hide-scrollbar transition-colors duration-500 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}>
         <button
-          onClick={() => { setShowOverview(false); setFeteTabOpen(false); }}
-          className={`relative px-4 flex items-center justify-center font-mono font-bold text-[10px] tracking-[0.2em] uppercase transition-colors ${isFeteActiveTab ? 'text-[#cd1d1d]/60 hover:text-[#cd1d1d]' : isPosterActiveTab ? (darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]') : (darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]')}`}
+          onClick={() => setShowOverview(false)}
+          className={`relative px-4 flex items-center justify-center font-mono font-bold text-[10px] tracking-[0.2em] uppercase transition-colors ${isPosterActiveTab ? (darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]') : (darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]')}`}
         >
           POSTER
           {isPosterActiveTab && <motion.div layoutId="view-toggle" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#F53D04]" />}
         </button>
-        <div className={`w-[1px] my-1 ${isFeteActiveTab ? 'bg-[#cd1d1d]/30' : darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
+        <div className={`w-[1px] my-1 ${darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
         <button
-          onClick={() => { setShowOverview(true); setFeteTabOpen(false); }}
-          className={`relative px-4 flex items-center justify-center font-mono font-bold text-[10px] tracking-[0.2em] uppercase transition-colors ${isFeteActiveTab ? 'text-[#cd1d1d]/60 hover:text-[#cd1d1d]' : isOverviewActiveTab ? (darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]') : (darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]')}`}
+          onClick={() => setShowOverview(true)}
+          className={`relative px-4 flex items-center justify-center font-mono font-bold text-[10px] tracking-[0.2em] uppercase transition-colors ${isOverviewActiveTab ? (darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]') : (darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]')}`}
         >
           OVERVIEW
           {isOverviewActiveTab && <motion.div layoutId="view-toggle" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#F53D04]" />}
         </button>
-        {/* TODO(fete-2026): temporary tab — remove with the rest of the Fête feature */}
-        {feteActive && (
-          <>
-            <div className={`w-[1px] my-1 ${isFeteActiveTab ? 'bg-[#cd1d1d]/30' : darkMode ? 'bg-[#2A2A2E]' : 'bg-[#E5E5EA]'}`} />
-            <button
-              onClick={() => setFeteTabOpen(true)}
-              className={`relative px-4 flex items-center justify-center font-mono font-bold text-[10px] tracking-[0.2em] uppercase transition-colors ${isFeteActiveTab ? 'text-[#cd1d1d]' : (darkMode ? 'text-[#6E6E73] hover:text-[#FFFFFF]' : 'text-[#8C8C92] hover:text-[#111111]')}`}
-            >
-              FÊTE GUIDE
-              {isFeteActiveTab && <motion.div layoutId="view-toggle" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#cd1d1d]" />}
-            </button>
-          </>
-        )}
       </div>
     </LayoutGroup>
   );
@@ -758,37 +684,7 @@ function GalleryView({ events, isShowingFuture, displayTitle, darkMode, feteActi
     </div>
   );
 
-  if (feteTabOpen) {
-    // TODO(fete-2026): this whole branch only renders while the Fête Guide
-    // tab is open, so its background is always the campaign yellow — remove
-    // with the rest of the Fête feature.
-    return (
-      <motion.div
-        variants={TAB_VARIANTS} initial="initial" animate="animate" exit="exit"
-        className="w-full h-full flex flex-col relative overflow-hidden bg-[#fdb903]"
-      >
-        <div className="shrink-0 flex justify-center py-2 md:py-3 relative z-30">
-          {toggle}
-        </div>
-        <FeteGuideContent events={feteEvents} darkMode={darkMode} />
-      </motion.div>
-    );
-  }
-
-  if (!hasEvents) {
-    if (!feteActive) return <EmptyState darkMode={darkMode} />;
-    return (
-      <motion.div
-        variants={TAB_VARIANTS} initial="initial" animate="animate" exit="exit"
-        className={`w-full h-full flex flex-col relative overflow-hidden ${darkMode ? 'bg-[#0B0B0D]' : 'bg-[#FFFFFF]'}`}
-      >
-        <div className="shrink-0 flex justify-center py-2 md:py-3 relative z-30">
-          {toggle}
-        </div>
-        <EmptyState darkMode={darkMode} />
-      </motion.div>
-    );
-  }
+  if (!hasEvents) return <EmptyState darkMode={darkMode} />;
 
   if (showOverview) {
     return (
@@ -1054,128 +950,6 @@ function EventsOverview({
   );
 }
 
-// TODO(fete-2026): temporary campaign component — remove with the rest of the
-// Fête feature (see src/features/fete/fete.config.ts).
-// TODO(fete-2026): temporary campaign component — remove with the rest of the
-// Fête feature. A one-shot cinematic wipe that plays once each time the app
-// shell switches into the Fête theme (mounted/unmounted by `feteThemeActive`
-// in the parent — its own internal timer hides it again shortly after).
-function FeteWipeOverlay() {
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    const t = setTimeout(() => setVisible(false), 1400);
-    return () => clearTimeout(t);
-  }, []);
-
-  return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          initial={{ scaleY: 0 }}
-          animate={{ scaleY: 1 }}
-          exit={{ scaleY: 0, transition: { duration: 0.7, ease: "easeIn" } }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          style={{ transformOrigin: "bottom" }}
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-[#fdb903] pointer-events-none"
-        >
-          <motion.span
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35, duration: 0.45 }}
-            className="font-black text-2xl md:text-5xl uppercase tracking-tight text-[#cd1d1d] text-center px-6"
-          >
-            Fête de la Musique
-          </motion.span>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-function FeteGuideContent({ events, darkMode }: { events: AfterFiveEvent[]; darkMode: boolean }) {
-  return (
-    <div className="relative flex-1 min-h-0 overflow-hidden bg-[#fdb903]">
-      <div className="relative z-10 h-full overflow-y-auto hide-scrollbar px-4 md:px-10 pb-4 md:pb-10 pt-0">
-        <div className="max-w-6xl w-full mx-auto flex flex-col gap-4 md:gap-6">
-          <div className="sticky top-0 z-20 border border-[#cd1d1d] p-3 md:p-4 shrink-0 flex items-center justify-between gap-3 flex-wrap bg-[#cd1d1d]">
-            <div>
-              <div className="font-mono font-bold text-[10px] uppercase tracking-[0.3em] text-[#fdb903] mb-1.5">
-                FÊTE DE LA MUSIQUE PH
-              </div>
-              <h1 className="font-black text-2xl md:text-4xl uppercase leading-none text-[#fdb903]">
-                {events.length} {events.length === 1 ? 'Event' : 'Events'}
-              </h1>
-            </div>
-
-            <a
-              href={FETE_INSTAGRAM_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="shrink-0 flex items-center gap-2 px-4 py-2.5 font-black text-xs uppercase tracking-widest bg-[#fdb903] text-[#cd1d1d] hover:bg-[#ffcc33] transition-colors"
-            >
-              <Instagram size={14} /> Visit Fête de la Musique PH
-            </a>
-          </div>
-
-          {events.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 px-8 text-center border-2 border-[#cd1d1d]/40 text-[#cd1d1d]">
-              <p className="font-black text-sm uppercase tracking-widest">No Fête de la Musique events tagged yet</p>
-              <p className="font-mono text-xs mt-2 uppercase tracking-wider opacity-70">Check back soon — more drops loading</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 pb-4">
-              {events.map((event, index) => (
-                <a
-                  key={`${event.id ?? event.club_name}-${index}`}
-                  href={event.ig_post_url || '#'}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={`group relative aspect-[3/4] w-full border-2 overflow-hidden transition-[border-color,transform] duration-200 hover:border-[#cd1d1d] hover:-translate-y-0.5 ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA]'}`}
-                >
-                  <div title="Fête de la Musique" className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 bg-[#cd1d1d] text-[#fdb903] font-black text-[8px] uppercase tracking-widest">
-                    Fête
-                  </div>
-
-                  <div className="absolute inset-0 overflow-hidden flex items-center justify-center">
-                    {event.image_url ? (
-                      <img
-                        src={event.image_url}
-                        alt={`${event.club_name} poster`}
-                        className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
-                      />
-                    ) : (
-                      <div className={`w-full h-full flex items-center justify-center p-4 text-center font-black text-lg uppercase ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>
-                        Poster Coming Soon
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="absolute inset-x-0 bottom-0 overflow-hidden">
-                    <div className={`p-3 border-t ${darkMode ? 'bg-[#151518]/95 border-[#2A2A2E]' : 'bg-[#FFFFFF]/97 border-[#E5E5EA]'}`}>
-                      {event.event_date && (
-                        <div className={`font-mono text-[9px] uppercase tracking-wider mb-1 ${darkMode ? 'text-[#6E6E73]' : 'text-[#8C8C92]'}`}>
-                          {new Date(event.event_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                        </div>
-                      )}
-                      <div className="font-black text-[#cd1d1d] text-xs uppercase line-clamp-1 mb-0.5">
-                        {event.club_name}
-                      </div>
-                      <div className={`font-black text-sm uppercase leading-tight line-clamp-2 ${darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]'}`}>
-                        {event.event_name || "Club Night"}
-                      </div>
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 interface BlockListViewProps extends ViewProps {
   title: string;
   today: string;
@@ -1299,50 +1073,36 @@ function BlockListView({ title, events, today, darkMode }: BlockListViewProps) {
           {sortedDates.map((date) => {
                const dateObj = new Date(date);
                const isWeekend = dateObj.getDay() === 5 || dateObj.getDay() === 6;
-               // TODO(fete-2026): temporary campaign highlight — remove with the rest of the Fête feature.
-               const isFeteDayActive = isFeteGuideActive() && isFeteDay(date);
 
                return (
-                 <div key={date} className={`relative ${isFeteDayActive ? 'ring-1 ring-[#cd1d1d] z-20' : isWeekend ? 'ring-1 ring-[#F53D04]/50 z-20' : ''}`}>
+                 <div key={date} className={`relative ${isWeekend ? 'ring-1 ring-[#F53D04]/50 z-20' : ''}`}>
                     <div
                       style={{ top: headerH || undefined }}
                       className={`sticky z-40 py-3 px-3 md:px-6 flex justify-between items-center transition-all ${
-                        isFeteDayActive
-                          ? 'bg-[#fdb903] border-b-2 border-[#cd1d1d]'
-                          : isWeekend
+                        isWeekend
                           ? (darkMode ? 'bg-[#1C1C20] border-b-2 border-[#F53D04]' : 'bg-[#FFE5DE] border-b-2 border-[#F53D04]')
                           : (darkMode ? 'bg-[#151518] border-b border-[#2A2A2E]' : 'bg-[#F7F7F9] border-b border-[#E5E5EA]')
                       }`}
                     >
                        <div className="flex items-center gap-3">
                           <div className={`border px-2 py-0.5 md:py-1 font-black text-2xl md:text-3xl ${
-                              isFeteDayActive
-                                ? 'bg-[#fdb903] text-[#cd1d1d] border-[#cd1d1d]'
-                                : isWeekend
+                              isWeekend
                                 ? 'bg-[#F53D04] text-[#FFFFFF] border-[#F53D04]'
                                 : (darkMode ? 'bg-[#1C1C20] text-[#FFFFFF] border-[#2A2A2E]' : 'bg-[#FFFFFF] border-[#E5E5EA] text-[#111111]')
                             }`}>
                             {dateObj.getDate()}
                           </div>
                           <span className={`font-black text-lg md:text-2xl uppercase leading-none tracking-wider ${
-                              isFeteDayActive
-                                ? 'text-[#cd1d1d]'
-                                : isWeekend
+                              isWeekend
                                 ? (darkMode ? 'text-[#F53D04] drop-shadow-[0_0_8px_rgba(245,61,4,0.4)]' : 'text-[#F53D04]')
                                 : (darkMode ? 'text-[#FFFFFF]' : 'text-[#111111]')
                             }`}>
                             {dateObj.toLocaleDateString("en-US", { weekday: 'long' })}
                           </span>
-                          {/* TODO(fete-2026): temporary badge — remove with the rest of the Fête feature */}
-                          {isFeteDayActive && (
-                            <span className="flex items-center gap-1 px-2 py-0.5 bg-[#cd1d1d] text-[#fdb903] font-black text-[9px] md:text-[10px] uppercase tracking-widest">
-                              Fête Day
-                            </span>
-                          )}
                        </div>
                     </div>
-                    
-                    <div className={`grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-0 border-b transition-colors duration-500 ${isFeteDayActive ? 'bg-[#fdb903]/15 border-[#cd1d1d]/40' : darkMode ? 'border-[#2A2A2E]' : 'border-[#E5E5EA]'}`}>
+
+                    <div className={`grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-0 border-b transition-colors duration-500 ${darkMode ? 'border-[#2A2A2E]' : 'border-[#E5E5EA]'}`}>
                        {grouped[date].map((e, i) => (
                           <a key={i} href={e.ig_post_url} target="_blank" rel="noreferrer" className={`group relative border-r flex flex-col h-full overflow-hidden hover:z-20 ${darkMode ? 'border-[#2A2A2E] bg-[#1C1C20]' : 'border-[#E5E5EA] bg-[#FFFFFF]'}`}>
                              <div className={`w-full aspect-square border-b flex items-center justify-center overflow-hidden ${darkMode ? 'bg-[#151518] border-[#2A2A2E]' : 'bg-[#F7F7F9] border-[#E5E5EA]'}`}>
@@ -1586,35 +1346,26 @@ interface SidebarLinkProps {
   icon: React.ReactNode;
   darkMode: boolean;
   highlight?: boolean;
-  // TODO(fete-2026): temporary campaign prop — remove with the rest of the Fête feature.
-  feteTheme?: boolean;
 }
 
-function SidebarLink({ label, sub, active, onClick, href, color, icon, darkMode, highlight = false, feteTheme = false }: SidebarLinkProps) {
+function SidebarLink({ label, sub, active, onClick, href, color, icon, darkMode, highlight = false }: SidebarLinkProps) {
 
-  // TODO(fete-2026): while the Fête theme is active, every nav row (not just
-  // the active one) flips to the campaign palette — remove with the rest of
-  // the Fête feature.
-  const baseBg = feteTheme
-    ? 'bg-[#fdb903] text-[#cd1d1d] border-[#cd1d1d]/30 hover:bg-[#fdb903]/80'
-    : highlight
+  const baseBg = highlight
     ? (darkMode ? 'bg-[#10B981]/10 text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#10B981]/20' : 'bg-[#10B981]/10 text-[#111111] border-[#E5E5EA] hover:bg-[#10B981]/20')
     : (darkMode ? 'bg-[#151518] text-[#FFFFFF] border-[#2A2A2E] hover:bg-[#1C1C20]' : 'bg-[#F7F7F9] text-[#111111] border-[#E5E5EA] hover:bg-[#FFFFFF]');
 
-  const activeBg = feteTheme
-    ? 'bg-[#cd1d1d] text-[#fdb903] border-[#cd1d1d]'
-    : darkMode ? 'bg-[#1C1C20] text-[#FFFFFF] border-[#2A2A2E]' : 'bg-[#FFFFFF] text-[#111111] border-[#E5E5EA]';
+  const activeBg = darkMode ? 'bg-[#1C1C20] text-[#FFFFFF] border-[#2A2A2E]' : 'bg-[#FFFFFF] text-[#111111] border-[#E5E5EA]';
 
-  const effectiveColor = feteTheme ? (active ? '#fdb903' : '#cd1d1d') : color;
+  const effectiveColor = color;
 
   const content = (
     <>
       <div className={`absolute left-0 top-0 bottom-0 w-1 transition-all ${active ? 'w-full opacity-5' : 'w-1'}`} style={{ backgroundColor: effectiveColor }} />
       <div className="relative z-10 pl-4">
         <h3 className={`font-black text-lg uppercase mb-1 ${active ? `drop-shadow-[0_0_8px_${effectiveColor}40]` : ''}`}>{label}</h3>
-        <p className={`font-mono text-[10px] font-bold tracking-widest uppercase ${!feteTheme && highlight ? 'opacity-80 text-[#10B981]' : 'opacity-60'}`}>{sub}</p>
+        <p className={`font-mono text-[10px] font-bold tracking-widest uppercase ${highlight ? 'opacity-80 text-[#10B981]' : 'opacity-60'}`}>{sub}</p>
       </div>
-      <div className={`relative z-10 transition-all ${active || highlight ? `scale-110 drop-shadow-[0_0_10px_${effectiveColor}]` : ''}`} style={{ color: feteTheme ? effectiveColor : active || highlight ? color : (darkMode ? '#B3B3B8' : '#55555A') }}>
+      <div className={`relative z-10 transition-all ${active || highlight ? `scale-110 drop-shadow-[0_0_10px_${effectiveColor}]` : ''}`} style={{ color: active || highlight ? color : (darkMode ? '#B3B3B8' : '#55555A') }}>
         {icon}
       </div>
     </>
@@ -1643,25 +1394,19 @@ interface MobileNavBtnProps {
   color: string;
   darkMode: boolean;
   highlight?: boolean;
-  // TODO(fete-2026): temporary campaign prop — remove with the rest of the Fête feature.
-  feteTheme?: boolean;
 }
 
-function MobileNavBtn({ icon, active, onClick, href, color, darkMode, highlight = false, feteTheme = false }: MobileNavBtnProps) {
-  const activeBg = feteTheme
-    ? 'bg-[#cd1d1d] text-[#fdb903]'
-    : darkMode ? 'bg-[#1C1C20] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#111111]';
+function MobileNavBtn({ icon, active, onClick, href, color, darkMode, highlight = false }: MobileNavBtnProps) {
+  const activeBg = darkMode ? 'bg-[#1C1C20] text-[#FFFFFF]' : 'bg-[#FFFFFF] text-[#111111]';
 
-  const baseBg = feteTheme
-    ? 'bg-[#fdb903] text-[#cd1d1d]'
-    : highlight
+  const baseBg = highlight
     ? (darkMode ? 'bg-[#10B981]/20 text-[#10B981]' : 'bg-[#10B981]/15 text-[#059669]')
     : (darkMode ? 'bg-[#151518] text-[#6E6E73]' : 'bg-[#F7F7F9] text-[#8C8C92]');
 
-  const effectiveColor = feteTheme ? (active ? '#fdb903' : '#cd1d1d') : color;
+  const effectiveColor = color;
 
   const content = (
-    <div className={`${active || highlight ? 'scale-125' : 'scale-100'} transition-all flex items-center justify-center w-full h-full`} style={{ color: feteTheme || active || highlight ? effectiveColor : 'inherit', filter: active || highlight ? `drop-shadow(0 0 8px ${effectiveColor})` : 'none' }}>
+    <div className={`${active || highlight ? 'scale-125' : 'scale-100'} transition-all flex items-center justify-center w-full h-full`} style={{ color: active || highlight ? effectiveColor : 'inherit', filter: active || highlight ? `drop-shadow(0 0 8px ${effectiveColor})` : 'none' }}>
       {icon}
     </div>
   );
